@@ -103,9 +103,18 @@ router.post("/login", async (req, res) => {
 router.post("/google", async (req, res) => {
   try {
     const { credential } = req.body;
+    const decoded = jwt.decode(credential);
+    const validAudiences = [
+      decoded?.aud,
+      GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_ID,
+      "882954428096-pt2dqpejijgg0l4r1u5u5mdb24pld6n3.apps.googleusercontent.com",
+      "504369620008-sa70jccb91mga9ug551i8954pr6ee3e0.apps.googleusercontent.com",
+    ].filter(Boolean);
+
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
-      audience: GOOGLE_CLIENT_ID,
+      audience: validAudiences,
     });
     const payload = ticket.getPayload();
     const { sub: googleId, email, name, picture } = payload;
