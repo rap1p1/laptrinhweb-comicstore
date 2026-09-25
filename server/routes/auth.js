@@ -7,12 +7,14 @@ import { authMiddleware } from "../middleware/auth.js";
 import { sendOTPEmail } from "../utils/email.js";
 
 const router = Router();
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "882954428096-pt2dqpejijgg0l4r1u5u5mdb24pld6n3.apps.googleusercontent.com";
+const JWT_SECRET = process.env.JWT_SECRET || "comicstore_jwt_secret_key_2026_ptit";
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 function generateToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role, name: user.name },
-    process.env.JWT_SECRET,
+    JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
   );
 }
@@ -103,7 +105,7 @@ router.post("/google", async (req, res) => {
     const { credential } = req.body;
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
     const { sub: googleId, email, name, picture } = payload;
@@ -136,7 +138,7 @@ router.post("/google", async (req, res) => {
     res.json({ user: safeUser, token });
   } catch (err) {
     console.error("Google auth error:", err);
-    res.status(401).json({ error: "Xác thực Google thất bại" });
+    res.status(401).json({ error: "Xác thực Google thất bại: " + (err.message || "") });
   }
 });
 
