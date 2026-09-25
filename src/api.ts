@@ -74,6 +74,14 @@ export const api = {
   getMyOrders: () => request("/orders/my-orders"),
   getAllOrders: () => request("/orders/all"),
   updateOrderStatus: (id: number, status: string) => request(`/orders/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  customerOrderAction: (id: number, action: string, return_reason?: string) =>
+    request(`/orders/${id}/customer-action`, { method: "PATCH", body: JSON.stringify({ action, return_reason }) }),
+
+  // Character Tags
+  getTags: (all?: boolean) => request(`/tags${all ? "?all=true" : ""}`),
+  createTag: (name: string, wiki_url?: string) => request("/tags", { method: "POST", body: JSON.stringify({ name, wiki_url }) }),
+  reviewTag: (id: number, status: string) => request(`/tags/${id}/review`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  deleteTag: (id: number) => request(`/tags/${id}`, { method: "DELETE" }),
 
   // Payment
   createPayment: (order_id: number) => request("/payment/create", { method: "POST", body: JSON.stringify({ order_id }) }),

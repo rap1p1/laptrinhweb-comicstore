@@ -91,7 +91,34 @@ router.get("/stats", authMiddleware, requireRole("MANAGER", "SYSTEM_ADMIN"), asy
     const comics = await pool.query("SELECT COUNT(*) FROM comics WHERE status = 'APPROVED'");
     const pending = await pool.query("SELECT COUNT(*) FROM comics WHERE status = 'PENDING'");
     const orders = await pool.query("SELECT COUNT(*) FROM orders");
-    const revenue = await pool.query("SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status IN ('PAID', 'CONFIRMED', 'DELIVERED')");
+
+    // Total revenue from active/completed orders
+    const revenue = await pool.query(
+      "SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status NOT IN ('CANCELLED', 'RETURNED', 'REJECTED')"
+    );
+    const deliveredRevenue = await pool.query(
+      "SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status IN ('DELIVERED', 'PAID')"
+    );
+    const shippingRevenue = await pool.query(
+      "SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status = 'SHIPPING'"
+    );
+
+    // Orders by status
+    const statusCounts = await pool.query(
+      "SELECT status, COUNT(*) as count, COALESCE(SUM(total), 0) as amount FROM orders GROUP BY status"
+    );
+
+    // Top selling comics
+    const topComics = await pool.query(`
+      SELECT c.id, c.title, c.image_url, COALESCE(SUM(oi.quantity), 0) as sold, COALESCE(SUM(oi.price * oi.quantity), 0) as revenue
+      FROM comics c
+      JOIN order_items oi ON c.id = oi.comic_id
+      JOIN orders o ON oi.order_id = o.id
+      WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'REJECTED')
+      GROUP BY c.id, c.title, c.image_url
+      ORDER BY sold DESC
+      LIMIT 5
+    `);
 
     res.json({
       totalUsers: parseInt(users.rows[0].count),
@@ -99,8 +126,13 @@ router.get("/stats", authMiddleware, requireRole("MANAGER", "SYSTEM_ADMIN"), asy
       pendingComics: parseInt(pending.rows[0].count),
       totalOrders: parseInt(orders.rows[0].count),
       totalRevenue: parseInt(revenue.rows[0].total),
+      deliveredRevenue: parseInt(deliveredRevenue.rows[0].total),
+      shippingRevenue: parseInt(shippingRevenue.rows[0].total),
+      statusStats: statusCounts.rows,
+      topSelling: topComics.rows,
     });
   } catch (err) {
+    console.error("Stats error:", err);
     res.status(500).json({ error: "Lỗi server" });
   }
 });

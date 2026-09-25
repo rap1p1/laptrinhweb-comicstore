@@ -14,6 +14,7 @@ type Comic = {
   issue: string;
   price: number;
   old_price?: number;
+  publish_year?: number;
   characters: string[];
   character_details?: CharacterDetail[];
   description: string;
@@ -56,10 +57,12 @@ function ComicCover({ comic }: { comic: Comic }) {
 
 export default function HomePage() {
   const [comics, setComics] = useState<Comic[]>([]);
+  const [years, setYears] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedComic, setSelectedComic] = useState<Comic | null>(null);
   const [searchParams] = useSearchParams();
   const [selectedTag, setSelectedTag] = useState("Tất cả");
+  const [selectedYear, setSelectedYear] = useState("Tất cả");
   const [query, setQuery] = useState(searchParams.get("search") || "");
   const { user, refreshCart } = useAuth();
   const [addingToCart, setAddingToCart] = useState<number | null>(null);
@@ -67,7 +70,7 @@ export default function HomePage() {
 
   const tags = useMemo(() => {
     const allChars = comics.flatMap((c) => c.characters);
-    return ["Tất cả", ...Array.from(new Set(allChars))];
+    return ["Tất cả", ...Array.from(new Set(allChars)).sort()];
   }, [comics]);
 
   useEffect(() => {
@@ -78,7 +81,13 @@ export default function HomePage() {
     try {
       setLoading(true);
       const data = await api.getComics();
-      setComics(data.comics);
+      setComics(data.comics || []);
+      if (data.years && Array.isArray(data.years)) {
+        setYears(data.years);
+      } else {
+        const uniqueYears = Array.from(new Set(data.comics.map((c: any) => c.publish_year).filter(Boolean))) as number[];
+        setYears(uniqueYears.sort((a, b) => b - a));
+      }
     } catch (err) {
       console.error("Failed to load comics:", err);
     } finally {
@@ -89,11 +98,16 @@ export default function HomePage() {
   const filtered = useMemo(() => {
     return comics.filter((comic) => {
       const matchesTag = selectedTag === "Tất cả" || comic.characters.includes(selectedTag);
+      const matchesYear = selectedYear === "Tất cả" || String(comic.publish_year) === selectedYear;
       const term = query.trim().toLowerCase();
-      const matchesQuery = !term || `${comic.title} ${comic.characters.join(" ")} ${comic.description}`.toLowerCase().includes(term);
-      return matchesTag && matchesQuery;
+      const matchesQuery =
+        !term ||
+        `${comic.title} ${comic.characters.join(" ")} ${comic.description} ${comic.publish_year || ""}`
+          .toLowerCase()
+          .includes(term);
+      return matchesTag && matchesYear && matchesQuery;
     });
-  }, [comics, selectedTag, query]);
+  }, [comics, selectedTag, selectedYear, query]);
 
   const addToCart = async (comicId: number) => {
     if (!user) {
@@ -140,7 +154,7 @@ export default function HomePage() {
               Những trang<br /><span className="text-[#e6202f]">huyền thoại</span>
             </h1>
             <p className="mt-7 max-w-lg text-base leading-7 text-white/75 sm:text-lg">
-              Sưu tầm những tập truyện tranh Marvel đỉnh cao. Từ Spider-Man, Iron Man, Avengers đến X-Men — tất cả có tại PANEL.
+              Sưu tầm những tập truyện tranh Marvel kinh điển. Từ Avengers, X-Men đến Spider-Man — tất cả có tại PANEL.
             </p>
             <a href="#catalog" className="mt-9 inline-flex items-center gap-5 bg-[#e51c2a] px-7 py-4 text-sm font-extrabold tracking-[.08em] uppercase transition hover:bg-white hover:text-black">
               Khám phá ngay <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m14 7 5 5-5 5" /></svg>
@@ -160,23 +174,44 @@ export default function HomePage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm kiếm truyện, nhân vật..."
-              className="border border-black/20 bg-transparent px-3 py-2 text-sm outline-none focus:border-[#e51c2a] w-48 sm:w-56"
+              placeholder="Tìm kiếm truyện, nhân vật, năm..."
+              className="border border-black/20 bg-transparent px-3 py-2 text-sm outline-none focus:border-[#e51c2a] w-48 sm:w-60"
             />
             <p className="text-sm font-semibold text-black/55 whitespace-nowrap">{filtered.length.toString().padStart(2, "0")} truyện</p>
           </div>
         </div>
 
-        <div className="scrollbar-none flex gap-2 overflow-x-auto py-7">
-          {tags.map((tag) => (
-            <button
-              key={tag}
-              onClick={() => setSelectedTag(tag)}
-              className={`shrink-0 border px-4 py-2.5 text-xs font-bold transition ${selectedTag === tag ? "border-black bg-black text-white" : "border-black/25 hover:border-black"}`}
-            >
-              {tag}
-            </button>
-          ))}
+        {/* Filter bars: Characters + Years */}
+        <div className="py-6 border-b border-black/10 space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-extrabold uppercase tracking-wider text-black/40 w-28 shrink-0">Nhân vật:</span>
+            <div className="scrollbar-none flex gap-2 overflow-x-auto">
+              {tags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedTag(tag)}
+                  className={`shrink-0 border px-3.5 py-1.5 text-xs font-bold transition rounded-sm ${selectedTag === tag ? "border-black bg-black text-white" : "border-black/20 hover:border-black"}`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-extrabold uppercase tracking-wider text-black/40 w-28 shrink-0">Năm phát hành:</span>
+            <div className="scrollbar-none flex gap-2 overflow-x-auto">
+              {["Tất cả", ...years.map(String)].map((y) => (
+                <button
+                  key={y}
+                  onClick={() => setSelectedYear(y)}
+                  className={`shrink-0 border px-3.5 py-1.5 text-xs font-bold transition rounded-sm ${selectedYear === y ? "border-[#e51c2a] bg-[#e51c2a] text-white" : "border-black/20 hover:border-black"}`}
+                >
+                  {y}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {loading ? (
@@ -185,7 +220,7 @@ export default function HomePage() {
             <p className="mt-4 text-sm text-black/50">Đang tải truyện Marvel...</p>
           </div>
         ) : filtered.length > 0 ? (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-12 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 lg:gap-x-7 lg:gap-y-16">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-12 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 lg:gap-x-7 lg:gap-y-16 mt-8">
             {filtered.map((comic) => (
               <article key={comic.id} className="group flex flex-col justify-between">
                 <div>
@@ -205,7 +240,7 @@ export default function HomePage() {
                   <div className="mt-4">
                     {/* Clickable Character Wiki Links */}
                     <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                      {comic.characters.slice(0, 3).map((char) => (
+                      {comic.characters.map((char) => (
                         <a
                           key={char}
                           href={getCharacterWiki(comic, char)}
@@ -227,7 +262,10 @@ export default function HomePage() {
                     >
                       <h3 className="font-display text-[20px] leading-tight font-extrabold tracking-[-.02em]">{comic.title}</h3>
                     </button>
-                    <p className="mt-1 text-xs text-black/50">{comic.issue}</p>
+                    <div className="mt-1 flex items-center justify-between text-xs text-black/50">
+                      <span>{comic.issue}</span>
+                      {comic.publish_year && <span className="font-mono font-bold text-black/40">{comic.publish_year}</span>}
+                    </div>
                   </div>
                 </div>
 
@@ -253,9 +291,9 @@ export default function HomePage() {
             ))}
           </div>
         ) : (
-          <div className="border border-dashed border-black/30 py-20 text-center">
+          <div className="border border-dashed border-black/30 py-20 text-center mt-8">
             <p className="font-display text-2xl font-bold">Không tìm thấy truyện phù hợp</p>
-            <button onClick={() => { setQuery(""); setSelectedTag("Tất cả"); }} className="mt-3 text-sm font-bold text-[#e51c2a] underline">Xóa bộ lọc</button>
+            <button onClick={() => { setQuery(""); setSelectedTag("Tất cả"); setSelectedYear("Tất cả"); }} className="mt-3 text-sm font-bold text-[#e51c2a] underline">Xóa bộ lọc</button>
           </div>
         )}
       </section>
@@ -302,9 +340,14 @@ export default function HomePage() {
                 </div>
 
                 <h2 className="font-display mt-2 text-4xl leading-[.95] font-black tracking-[-.03em] uppercase sm:text-5xl">{selectedComic.title}</h2>
-                <p className="mt-3 text-sm text-black/50">{selectedComic.issue}</p>
-                <p className="mt-7 text-base leading-7 text-black/80">{selectedComic.description}</p>
-                <div className="mt-7 border-l-4 border-[#e51c2a] bg-white/65 p-5">
+                <div className="mt-3 flex items-center gap-4 text-sm text-black/60">
+                  <span>{selectedComic.issue}</span>
+                  {selectedComic.publish_year && (
+                    <span className="border-l border-black/20 pl-4 font-semibold">Năm xuất bản: <strong className="text-[#e51c2a]">{selectedComic.publish_year}</strong></span>
+                  )}
+                </div>
+                <p className="mt-6 text-base leading-7 text-black/80">{selectedComic.description}</p>
+                <div className="mt-6 border-l-4 border-[#e51c2a] bg-white/65 p-5">
                   <p className="mb-2 text-[10px] font-black tracking-[.16em] uppercase">Đọc thử trích đoạn</p>
                   <p className="font-serif text-[17px] leading-7 italic text-black/85">&ldquo;{selectedComic.preview}&rdquo;</p>
                 </div>

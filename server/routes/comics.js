@@ -7,7 +7,7 @@ const router = Router();
 // Get all approved comics (public)
 router.get("/", optionalAuth, async (req, res) => {
   try {
-    const { search, character, page = 1, limit = 20 } = req.query;
+    const { search, character, year, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
     let query = `
       SELECT c.*, 
@@ -28,43 +28,54 @@ router.get("/", optionalAuth, async (req, res) => {
     const params = [];
     let paramIndex = 1;
 
+    let countQuery = "SELECT COUNT(DISTINCT c.id) FROM comics c LEFT JOIN comic_characters cc ON c.id = cc.comic_id WHERE c.status = 'APPROVED'";
+    const countParams = [];
+    let cParamIndex = 1;
+
     if (search) {
       query += ` AND (c.title ILIKE $${paramIndex} OR c.description ILIKE $${paramIndex})`;
       params.push(`%${search}%`);
       paramIndex++;
+      countQuery += ` AND (c.title ILIKE $${cParamIndex} OR c.description ILIKE $${cParamIndex})`;
+      countParams.push(`%${search}%`);
+      cParamIndex++;
     }
 
     if (character && character !== "Tất cả") {
       query += ` AND EXISTS (SELECT 1 FROM comic_characters cc2 WHERE cc2.comic_id = c.id AND cc2.character_name = $${paramIndex})`;
       params.push(character);
       paramIndex++;
+      countQuery += ` AND EXISTS (SELECT 1 FROM comic_characters cc2 WHERE cc2.comic_id = c.id AND cc2.character_name = $${cParamIndex})`;
+      countParams.push(character);
+      cParamIndex++;
+    }
+
+    if (year && year !== "Tất cả") {
+      query += ` AND c.publish_year = $${paramIndex}`;
+      params.push(parseInt(year));
+      paramIndex++;
+      countQuery += ` AND c.publish_year = $${cParamIndex}`;
+      countParams.push(parseInt(year));
+      cParamIndex++;
     }
 
     query += ` GROUP BY c.id ORDER BY c.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(parseInt(limit), parseInt(offset));
 
     const result = await pool.query(query, params);
-
-    // Get total count
-    let countQuery = "SELECT COUNT(DISTINCT c.id) FROM comics c LEFT JOIN comic_characters cc ON c.id = cc.comic_id WHERE c.status = 'APPROVED'";
-    const countParams = [];
-    let cParamIndex = 1;
-    if (search) {
-      countQuery += ` AND (c.title ILIKE $${cParamIndex} OR c.description ILIKE $${cParamIndex})`;
-      countParams.push(`%${search}%`);
-      cParamIndex++;
-    }
-    if (character && character !== "Tất cả") {
-      countQuery += ` AND EXISTS (SELECT 1 FROM comic_characters cc2 WHERE cc2.comic_id = c.id AND cc2.character_name = $${cParamIndex})`;
-      countParams.push(character);
-    }
     const countResult = await pool.query(countQuery, countParams);
+
+    const yearsResult = await pool.query(
+      "SELECT DISTINCT publish_year FROM comics WHERE status = 'APPROVED' AND publish_year IS NOT NULL ORDER BY publish_year DESC"
+    );
+    const availableYears = yearsResult.rows.map((r) => r.publish_year);
 
     res.json({
       comics: result.rows,
       total: parseInt(countResult.rows[0].count),
       page: parseInt(page),
       totalPages: Math.ceil(countResult.rows[0].count / limit),
+      years: availableYears,
     });
   } catch (err) {
     console.error("Get comics error:", err);
@@ -107,16 +118,16 @@ router.get("/:id", async (req, res) => {
 // Create comic (PUBLISHER)
 router.post("/", authMiddleware, requireRole("PUBLISHER", "SYSTEM_ADMIN"), async (req, res) => {
   try {
-    const { title, issue, price, old_price, description, preview, image_url, color, accent, mark, badge, stock, characters } = req.body;
+    const { title, issue, price, old_price, description, preview, image_url, color, accent, mark, badge, stock, publish_year, characters } = req.body;
     
     if (!title || !price) {
       return res.status(400).json({ error: "Tên truyện và giá là bắt buộc" });
     }
 
     const result = await pool.query(
-      `INSERT INTO comics (title, issue, price, old_price, description, preview, image_url, color, accent, mark, badge, stock, status, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'PENDING', $13) RETURNING *`,
-      [title, issue, price, old_price || null, description, preview, image_url, color || "#111111", accent || "#e51c2a", mark, badge, stock || 0, req.user.id]
+      `INSERT INTO comics (title, issue, price, old_price, description, preview, image_url, color, accent, mark, badge, stock, publish_year, status, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'PENDING', $14) RETURNING *`,
+      [title, issue, price, old_price || null, description, preview, image_url, color || "#111111", accent || "#e51c2a", mark, badge, stock || 0, publish_year ? parseInt(publish_year) : 2024, req.user.id]
     );
 
     const comic = result.rows[0];
@@ -151,12 +162,12 @@ router.put("/:id", authMiddleware, requireRole("PUBLISHER", "SYSTEM_ADMIN"), asy
       return res.status(403).json({ error: "Không có quyền" });
     }
 
-    const { title, issue, price, old_price, description, preview, image_url, color, accent, mark, badge, stock, characters } = req.body;
+    const { title, issue, price, old_price, description, preview, image_url, color, accent, mark, badge, stock, publish_year, characters } = req.body;
 
     const result = await pool.query(
       `UPDATE comics SET title=$1, issue=$2, price=$3, old_price=$4, description=$5, preview=$6, image_url=$7, 
-       color=$8, accent=$9, mark=$10, badge=$11, stock=$12, status='PENDING', updated_at=NOW() WHERE id=$13 RETURNING *`,
-      [title, issue, price, old_price || null, description, preview, image_url, color, accent, mark, badge, stock, id]
+       color=$8, accent=$9, mark=$10, badge=$11, stock=$12, publish_year=$13, status='PENDING', updated_at=NOW() WHERE id=$14 RETURNING *`,
+      [title, issue, price, old_price || null, description, preview, image_url, color, accent, mark, badge, stock, publish_year ? parseInt(publish_year) : 2024, id]
     );
 
     // Update characters

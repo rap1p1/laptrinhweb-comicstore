@@ -161,7 +161,7 @@ export default function Layout() {
             </div>
           </div>
           <div className="mt-8 flex flex-col justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/30 sm:flex-row">
-            <p>© 2025 PANEL. Đồ án môn Lập trình Web — PTIT HCM</p>
+            <p>© 2026 PANEL. Đồ án môn Lập trình Web — PTIT HCM</p>
             <p>Bộ môn Công nghệ Thông tin</p>
           </div>
         </div>

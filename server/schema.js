@@ -27,12 +27,22 @@ CREATE TABLE IF NOT EXISTS comics (
   mark VARCHAR(50),
   badge VARCHAR(50),
   stock INTEGER DEFAULT 0,
+  publish_year INTEGER,
   status VARCHAR(20) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'PENDING', 'APPROVED', 'REJECTED')),
   reject_reason TEXT,
   created_by INTEGER REFERENCES users(id),
   approved_by INTEGER REFERENCES users(id),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS character_tags (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) UNIQUE NOT NULL,
+  wiki_url VARCHAR(512),
+  status VARCHAR(20) DEFAULT 'APPROVED' CHECK (status IN ('APPROVED', 'PENDING', 'REJECTED')),
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS comic_characters (
@@ -55,12 +65,13 @@ CREATE TABLE IF NOT EXISTS orders (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id),
   total INTEGER NOT NULL,
-  status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PAID', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED')),
+  status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PAID', 'CONFIRMED', 'SHIPPING', 'DELIVERED', 'RETURN_REQUESTED', 'RETURNED', 'REJECTED', 'CANCELLED')),
   payment_method VARCHAR(20) DEFAULT 'COD',
   payment_ref VARCHAR(255),
   shipping_name VARCHAR(255),
   shipping_phone VARCHAR(20),
   shipping_address TEXT,
+  return_reason TEXT,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -93,6 +104,14 @@ export async function initDB() {
   try {
     await pool.query(schema);
     await pool.query("ALTER TABLE comic_characters ADD COLUMN IF NOT EXISTS wiki_url VARCHAR(512)");
+    await pool.query("ALTER TABLE comics ADD COLUMN IF NOT EXISTS publish_year INTEGER");
+    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS return_reason TEXT");
+    try {
+      await pool.query("ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check");
+      await pool.query("ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('PENDING', 'PAID', 'CONFIRMED', 'SHIPPING', 'DELIVERED', 'RETURN_REQUESTED', 'RETURNED', 'REJECTED', 'CANCELLED'))");
+    } catch (e) {
+      // constraint alter fallback
+    }
     console.log("✅ Database schema initialized");
   } catch (err) {
     console.error("❌ Database init error:", err.message);

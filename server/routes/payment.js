@@ -52,6 +52,16 @@ router.post("/create", authMiddleware, async (req, res) => {
 
     const sortedParams = sortObject(vnpParams);
     const signData = new URLSearchParams(sortedParams).toString();
+    if (!process.env.VNP_TMN_CODE || !process.env.VNP_HASH_SECRET || !process.env.VNP_URL) {
+      // VNPay sandbox keys not yet configured in environment
+      // Automatically keep order as CONFIRMED (COD fallback)
+      await pool.query("UPDATE orders SET payment_method = 'COD', status = 'CONFIRMED' WHERE id = $1", [order.id]);
+      return res.status(200).json({ 
+        fallbackCod: true, 
+        message: "Cổng thanh toán VNPay chưa được cấu hình khóa bí mật. Đơn hàng đã được tự động chuyển sang Thanh toán khi nhận hàng (COD)." 
+      });
+    }
+
     const hmac = crypto.createHmac("sha512", process.env.VNP_HASH_SECRET);
     const signed = hmac.update(Buffer.from(signData, "utf-8")).digest("hex");
 
@@ -64,7 +74,7 @@ router.post("/create", authMiddleware, async (req, res) => {
     res.json({ paymentUrl });
   } catch (err) {
     console.error("VNPay create error:", err);
-    res.status(500).json({ error: "Lỗi tạo thanh toán" });
+    res.status(500).json({ error: "Lỗi tạo thanh toán VNPay" });
   }
 });
 

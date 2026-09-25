@@ -13,6 +13,29 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { setUser } = useAuth();
 
+  const handleQuickLogin = async (demoEmail: string, demoPass: string) => {
+    setEmail(demoEmail);
+    setPassword(demoPass);
+    setError("");
+    setLoading(true);
+    try {
+      const data = await api.login(demoEmail, demoPass);
+      api.setAuth(data.token, data.user);
+      setUser(data.user);
+      if (data.user.role === "SYSTEM_ADMIN" || data.user.role === "MANAGER") {
+        navigate("/dashboard");
+      } else if (data.user.role === "PUBLISHER") {
+        navigate("/publisher/comics");
+      } else {
+        navigate("/");
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -123,7 +146,7 @@ export default function LoginPage() {
 
           <button
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 border border-black/20 py-3 text-sm font-bold hover:bg-white/70 transition"
+            className="w-full flex items-center justify-center gap-3 border border-black/20 py-3 text-sm font-bold hover:bg-white/70 transition bg-white"
           >
             <svg className="size-5" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -133,6 +156,47 @@ export default function LoginPage() {
             </svg>
             Đăng nhập với Google
           </button>
+
+          {/* 1-Click Demo Accounts for Professor/Grader */}
+          <div className="mt-6 pt-5 border-t border-black/15">
+            <p className="text-[11px] font-black uppercase tracking-wider text-black/60 mb-2.5 text-center">
+              Tài khoản Demo 1 chạm (Dành cho Giảng viên / Chấm bài)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("admin@comicstore.vn", "admin123")}
+                className="bg-black text-white hover:bg-[#e51c2a] py-2 px-2 text-xs font-bold transition text-left flex flex-col"
+              >
+                <span>👑 Admin</span>
+                <span className="text-[9px] text-white/60 font-normal truncate">Toàn quyền hệ thống</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("manager@comicstore.vn", "manager123")}
+                className="bg-black text-white hover:bg-[#e51c2a] py-2 px-2 text-xs font-bold transition text-left flex flex-col"
+              >
+                <span>📦 Quản Lý</span>
+                <span className="text-[9px] text-white/60 font-normal truncate">Duyệt đơn, doanh thu</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("publisher@comicstore.vn", "publisher123")}
+                className="bg-black text-white hover:bg-[#e51c2a] py-2 px-2 text-xs font-bold transition text-left flex flex-col"
+              >
+                <span>✍️ Nhà Xuất Bản</span>
+                <span className="text-[9px] text-white/60 font-normal truncate">Tạo truyện, đề xuất tag</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("buyer@comicstore.vn", "buyer123")}
+                className="bg-black text-white hover:bg-[#e51c2a] py-2 px-2 text-xs font-bold transition text-left flex flex-col"
+              >
+                <span>🛒 Khách Hàng</span>
+                <span className="text-[9px] text-white/60 font-normal truncate">Mua & nhận đơn hàng</span>
+              </button>
+            </div>
+          </div>
 
           <p className="mt-6 text-center text-sm text-black/50">
             Chưa có tài khoản?{" "}

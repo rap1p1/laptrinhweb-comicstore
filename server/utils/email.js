@@ -26,7 +26,7 @@ export async function sendOTPEmail(to, otp, type) {
         <div style="font-size: 36px; font-weight: 900; letter-spacing: 8px; color: #e51c2a; margin: 20px 0; padding: 15px; background: #f8f8f8; border-radius: 8px;">${otp}</div>
         <p style="color: #999; font-size: 13px;">Mã có hiệu lực trong 10 phút. Không chia sẻ mã này với ai.</p>
       </div>
-      <p style="text-align: center; color: #aaa; font-size: 11px; margin-top: 20px;">© 2025 PANEL. Comic Store - PTIT HCM</p>
+      <p style="text-align: center; color: #aaa; font-size: 11px; margin-top: 20px;">© 2026 PANEL. Comic Store - PTIT HCM</p>
     </div>
   `;
 
@@ -78,7 +78,7 @@ export async function sendOrderConfirmation(to, order, items) {
           <p style="margin: 3px 0;"><strong>Thanh toán:</strong> ${order.payment_method === "VNPAY" ? "VNPay" : "COD"}</p>
         </div>
       </div>
-      <p style="text-align: center; color: #aaa; font-size: 11px; margin-top: 20px;">© 2025 PANEL. Comic Store - PTIT HCM</p>
+      <p style="text-align: center; color: #aaa; font-size: 11px; margin-top: 20px;">© 2026 PANEL. Comic Store - PTIT HCM</p>
     </div>
   `;
 

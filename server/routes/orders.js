@@ -130,15 +130,80 @@ router.get("/all", authMiddleware, requireRole("MANAGER", "SYSTEM_ADMIN"), async
   }
 });
 
+// Customer action on order (BUYER)
+router.patch("/:id/customer-action", authMiddleware, async (req, res) => {
+  try {
+    const { action, return_reason } = req.body;
+    const orderResult = await pool.query("SELECT * FROM orders WHERE id = $1 AND user_id = $2", [req.params.id, req.user.id]);
+    if (orderResult.rows.length === 0) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
+
+    const order = orderResult.rows[0];
+    let newStatus = null;
+
+    if (action === "CANCEL") {
+      if (!["PENDING", "CONFIRMED"].includes(order.status)) {
+        return res.status(400).json({ error: "Chỉ có thể hủy đơn khi chưa giao hàng" });
+      }
+      newStatus = "CANCELLED";
+    } else if (action === "CONFIRM_RECEIVED") {
+      if (order.status !== "SHIPPING") {
+        return res.status(400).json({ error: "Đơn hàng phải ở trạng thái đang giao" });
+      }
+      newStatus = "DELIVERED";
+    } else if (action === "REJECT_DELIVERY") {
+      if (order.status !== "SHIPPING") {
+        return res.status(400).json({ error: "Đơn hàng phải ở trạng thái đang giao" });
+      }
+      newStatus = "REJECTED";
+    } else if (action === "REQUEST_RETURN") {
+      if (order.status !== "DELIVERED") {
+        return res.status(400).json({ error: "Chỉ có thể yêu cầu hoàn sau khi đã nhận hàng" });
+      }
+      newStatus = "RETURN_REQUESTED";
+    } else {
+      return res.status(400).json({ error: "Hành động không hợp lệ" });
+    }
+
+    const updated = await pool.query(
+      "UPDATE orders SET status = $1, return_reason = COALESCE($2, return_reason) WHERE id = $3 RETURNING *",
+      [newStatus, return_reason || null, req.params.id]
+    );
+
+    // If cancelled or rejected, restore stock
+    if (["CANCELLED", "REJECTED"].includes(newStatus)) {
+      const items = await pool.query("SELECT comic_id, quantity FROM order_items WHERE order_id = $1", [req.params.id]);
+      for (const item of items.rows) {
+        await pool.query("UPDATE comics SET stock = stock + $1 WHERE id = $2", [item.quantity, item.comic_id]);
+      }
+    }
+
+    res.json(updated.rows[0]);
+  } catch (err) {
+    console.error("Customer action error:", err);
+    res.status(500).json({ error: "Lỗi xử lý đơn hàng" });
+  }
+});
+
 // Update order status (MANAGER / ADMIN)
 router.patch("/:id/status", authMiddleware, requireRole("MANAGER", "SYSTEM_ADMIN"), async (req, res) => {
   try {
     const { status } = req.body;
+    const oldOrder = await pool.query("SELECT * FROM orders WHERE id = $1", [req.params.id]);
+    if (oldOrder.rows.length === 0) return res.status(404).json({ error: "Không tìm thấy đơn" });
+
     const result = await pool.query(
       "UPDATE orders SET status = $1 WHERE id = $2 RETURNING *",
       [status, req.params.id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: "Không tìm thấy đơn" });
+
+    // If cancelled or returned, restore stock
+    if (["CANCELLED", "RETURNED", "REJECTED"].includes(status) && !["CANCELLED", "RETURNED", "REJECTED"].includes(oldOrder.rows[0].status)) {
+      const items = await pool.query("SELECT comic_id, quantity FROM order_items WHERE order_id = $1", [req.params.id]);
+      for (const item of items.rows) {
+        await pool.query("UPDATE comics SET stock = stock + $1 WHERE id = $2", [item.quantity, item.comic_id]);
+      }
+    }
+
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: "Lỗi server" });

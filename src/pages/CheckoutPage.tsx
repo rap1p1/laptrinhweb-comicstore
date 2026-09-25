@@ -52,8 +52,18 @@ export default function CheckoutPage() {
       await refreshCart();
 
       if (paymentMethod === "VNPAY") {
-        const { paymentUrl } = await api.createPayment(order.id);
-        window.location.href = paymentUrl;
+        try {
+          const res = await api.createPayment(order.id);
+          if (res?.paymentUrl) {
+            window.location.href = res.paymentUrl;
+            return;
+          }
+          // If fallbackCod returned or no URL
+          navigate(`/payment/success?orderId=${order.id}&notice=vnpay_fallback`);
+        } catch (vnpErr: any) {
+          console.warn("VNPay error, fallback to COD:", vnpErr);
+          navigate(`/payment/success?orderId=${order.id}&notice=vnpay_fallback`);
+        }
       } else {
         navigate(`/payment/success?orderId=${order.id}`);
       }
@@ -97,8 +107,11 @@ export default function CheckoutPage() {
               <div className="space-y-3">
                 <label className={`flex items-center gap-4 border p-4 cursor-pointer transition ${paymentMethod === "COD" ? "border-[#e51c2a] bg-red-50/50" : "border-black/10 hover:border-black/30"}`}>
                   <input type="radio" name="payment" value="COD" checked={paymentMethod === "COD"} onChange={() => setPaymentMethod("COD")} className="accent-[#e51c2a]" />
-                  <div>
-                    <p className="text-sm font-bold">Thanh toán khi nhận hàng (COD)</p>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold">Thanh toán khi nhận hàng (COD)</p>
+                      <span className="text-[10px] bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded">Khuyên dùng demo</span>
+                    </div>
                     <p className="text-xs text-black/50">Thanh toán bằng tiền mặt khi nhận được hàng</p>
                   </div>
                 </label>

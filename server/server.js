@@ -8,6 +8,7 @@ import cartRoutes from "./routes/cart.js";
 import orderRoutes from "./routes/orders.js";
 import paymentRoutes from "./routes/payment.js";
 import userRoutes from "./routes/users.js";
+import tagRoutes from "./routes/tags.js";
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/tags", tagRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
