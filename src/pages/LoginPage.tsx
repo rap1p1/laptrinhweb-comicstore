@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../App";
 
-const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "504369620008-sa70jccb91mga9ug551i8954pr6ee3e0.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "882954428096-pt2dqpejijgg0l4r1u5u5mdb24pld6n3.apps.googleusercontent.com";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
