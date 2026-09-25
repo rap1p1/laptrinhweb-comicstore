@@ -92,6 +92,9 @@ export default function Layout() {
                             <Icon name="dashboard" className="size-4" /> Dashboard
                           </button>
                         )}
+                        <button onClick={() => { navigate("/profile"); setShowUserMenu(false); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-black/5 transition">
+                          <Icon name="user" className="size-4" /> Cài đặt & Hồ sơ
+                        </button>
                         <button onClick={() => { navigate("/my-orders"); setShowUserMenu(false); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-black/5 transition">
                           <Icon name="order" className="size-4" /> Đơn hàng của tôi
                         </button>

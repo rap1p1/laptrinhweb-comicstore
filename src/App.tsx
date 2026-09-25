@@ -17,6 +17,7 @@ import PendingComics from "./pages/PendingComics";
 import ManageUsers from "./pages/ManageUsers";
 import PublisherComics from "./pages/PublisherComics";
 import ComicForm from "./pages/ComicForm";
+import ProfilePage from "./pages/ProfilePage";
 
 type User = {
   id: number;
@@ -26,6 +27,8 @@ type User = {
   avatar?: string;
   is_verified: boolean;
   google_id?: string;
+  phone?: string;
+  address?: string;
 };
 
 type AuthContextType = {
@@ -90,6 +93,8 @@ export default function App() {
             <Route path="/cart" element={<CartPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/my-orders" element={<MyOrders />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/settings" element={<ProfilePage />} />
             <Route path="/payment/success" element={<PaymentSuccess />} />
             <Route path="/payment/failed" element={<PaymentFailed />} />
             <Route path="/dashboard" element={<DashboardPage />} />

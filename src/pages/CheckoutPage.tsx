@@ -12,13 +12,16 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("COD");
   const [name, setName] = useState(user?.name || "");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [address, setAddress] = useState(user?.address || "");
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) { navigate("/login"); return; }
+    if (user.name && !name) setName(user.name);
+    if (user.phone && !phone) setPhone(user.phone);
+    if (user.address && !address) setAddress(user.address);
     loadCart();
   }, [user]);
 

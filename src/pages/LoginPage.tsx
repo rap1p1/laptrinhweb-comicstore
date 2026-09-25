@@ -66,8 +66,11 @@ export default function LoginPage() {
               setError("");
               const data = await api.googleLogin(response.credential);
               api.setAuth(data.token, data.user);
-              setUser(data.user);
-              navigate("/");
+              if (data.isNewUser || !data.user?.phone || !data.user?.address) {
+                navigate("/profile?onboarding=true");
+              } else {
+                navigate("/");
+              }
             } catch (err: any) {
               setError(err.message || "Đăng nhập Google thất bại");
             } finally {

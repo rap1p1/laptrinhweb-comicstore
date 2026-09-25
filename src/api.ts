@@ -40,6 +40,8 @@ export const api = {
   register: (email: string, name: string, password: string) => request("/auth/register", { method: "POST", body: JSON.stringify({ email, name, password }) }),
   googleLogin: (credential: string) => request("/auth/google", { method: "POST", body: JSON.stringify({ credential }) }),
   me: () => request("/auth/me"),
+  updateProfile: (data: { name: string; phone?: string; address?: string; avatar?: string }) =>
+    request("/auth/profile", { method: "PATCH", body: JSON.stringify(data) }),
   verifyEmail: (code: string) => request("/auth/verify-email", { method: "POST", body: JSON.stringify({ code }) }),
   forgotPassword: (email: string) => request("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
   resetPassword: (email: string, code: string, newPassword: string) => request("/auth/reset-password", { method: "POST", body: JSON.stringify({ email, code, newPassword }) }),

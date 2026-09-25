@@ -144,7 +144,7 @@ router.post("/google", async (req, res) => {
 
     const token = generateToken(user);
     const { password_hash, ...safeUser } = user;
-    res.json({ user: safeUser, token });
+    res.json({ user: safeUser, token, isNewUser: !safeUser.phone || !safeUser.address });
   } catch (err) {
     console.error("Google auth error:", err);
     res.status(401).json({ error: "Xác thực Google thất bại: " + (err.message || "") });
@@ -268,7 +268,7 @@ router.post("/change-password", authMiddleware, async (req, res) => {
 router.get("/me", authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT id, email, name, role, avatar, is_verified, google_id, created_at FROM users WHERE id = $1",
+      "SELECT id, email, name, role, avatar, is_verified, google_id, phone, address, created_at FROM users WHERE id = $1",
       [req.user.id]
     );
     if (result.rows.length === 0) {
@@ -277,6 +277,36 @@ router.get("/me", authMiddleware, async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: "Lỗi server" });
+  }
+});
+
+// Update user profile (Name, Phone, Address, Avatar)
+router.patch("/profile", authMiddleware, async (req, res) => {
+  try {
+    const { name, phone, address, avatar } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: "Họ và tên không được để trống" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users 
+       SET name = $1, 
+           phone = $2, 
+           address = $3, 
+           avatar = COALESCE($4, avatar) 
+       WHERE id = $5 
+       RETURNING id, email, name, role, avatar, is_verified, google_id, phone, address, created_at`,
+      [name.trim(), phone ? phone.trim() : null, address ? address.trim() : null, avatar || null, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Không tìm thấy người dùng" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Update profile error:", err);
+    res.status(500).json({ error: "Lỗi cập nhật hồ sơ" });
   }
 });
 

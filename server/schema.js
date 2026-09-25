@@ -106,6 +106,8 @@ export async function initDB() {
     await pool.query("ALTER TABLE comic_characters ADD COLUMN IF NOT EXISTS wiki_url VARCHAR(512)");
     await pool.query("ALTER TABLE comics ADD COLUMN IF NOT EXISTS publish_year INTEGER");
     await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS return_reason TEXT");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50)");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT");
     try {
       await pool.query("ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check");
       await pool.query("ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('PENDING', 'PAID', 'CONFIRMED', 'SHIPPING', 'DELIVERED', 'RETURN_REQUESTED', 'RETURNED', 'REJECTED', 'CANCELLED'))");
