@@ -242,33 +242,38 @@ router.post("/reset-password", async (req, res) => {
   }
 });
 
-// Change Password
+// Change / Set Password (supports Google accounts setting password for first time)
 router.post("/change-password", authMiddleware, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: "Thiếu thông tin" });
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: "Mật khẩu mới tối thiểu 6 ký tự" });
     }
 
     const result = await pool.query("SELECT password_hash FROM users WHERE id = $1", [req.user.id]);
     const user = result.rows[0];
 
-    if (!user.password_hash) {
-      return res.status(400).json({ error: "Tài khoản Google không thể đổi mật khẩu" });
-    }
-
-    const valid = await bcrypt.compare(currentPassword, user.password_hash);
-    if (!valid) {
-      return res.status(400).json({ error: "Mật khẩu hiện tại không đúng" });
+    // If user already has a password, verify currentPassword
+    if (user.password_hash) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: "Vui lòng nhập mật khẩu hiện tại" });
+      }
+      const valid = await bcrypt.compare(currentPassword, user.password_hash);
+      if (!valid) {
+        return res.status(400).json({ error: "Mật khẩu hiện tại không đúng" });
+      }
     }
 
     const hash = await bcrypt.hash(newPassword, 10);
     await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hash, req.user.id]);
 
-    res.json({ message: "Đổi mật khẩu thành công" });
+    res.json({ 
+      message: user.password_hash ? "Đổi mật khẩu thành công" : "Thiết lập mật khẩu mới thành công",
+      has_password: true
+    });
   } catch (err) {
     console.error("Change password error:", err);
-    res.status(500).json({ error: "Lỗi server" });
+    res.status(500).json({ error: "Lỗi server: " + (err.message || "") });
   }
 });
 
@@ -276,7 +281,7 @@ router.post("/change-password", authMiddleware, async (req, res) => {
 router.get("/me", authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT id, email, name, role, avatar, is_verified, google_id, phone, address, created_at FROM users WHERE id = $1",
+      "SELECT id, email, name, role, avatar, is_verified, google_id, phone, address, (password_hash IS NOT NULL) as has_password, created_at FROM users WHERE id = $1",
       [req.user.id]
     );
     if (result.rows.length === 0) {

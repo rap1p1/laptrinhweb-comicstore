@@ -6,6 +6,12 @@ import { sendOrderConfirmation } from "../utils/email.js";
 
 const router = Router();
 
+const VNP_TMN_CODE = process.env.VNP_TMN_CODE || "QO40JJ9S";
+const VNP_HASH_SECRET = process.env.VNP_HASH_SECRET || "AYVEJYTULOZISSGDVDRBUQCCYZBABFYT";
+const VNP_URL = process.env.VNP_URL || "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
+const CLIENT_URL = process.env.CLIENT_URL || "https://laptrinhweb-comicstore-ltw9.vercel.app";
+const VNP_RETURN_URL = process.env.VNP_RETURN_URL || `${CLIENT_URL}/api/payment/return`;
+
 function sortObject(obj) {
   const sorted = {};
   const keys = Object.keys(obj).sort();
@@ -32,41 +38,38 @@ router.post("/create", authMiddleware, async (req, res) => {
     const order = orderResult.rows[0];
     const date = new Date();
     const createDate = date.toISOString().replace(/[-T:Z.]/g, "").slice(0, 14);
-
     const orderId = `${createDate}${order.id.toString().padStart(6, "0")}`;
+
+    let ipAddr = req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "127.0.0.1";
+    if (typeof ipAddr === "string" && ipAddr.includes(",")) {
+      ipAddr = ipAddr.split(",")[0].trim();
+    }
+    if (ipAddr === "::1" || !ipAddr) {
+      ipAddr = "127.0.0.1";
+    }
 
     const vnpParams = {
       vnp_Version: "2.1.0",
       vnp_Command: "pay",
-      vnp_TmnCode: process.env.VNP_TMN_CODE,
+      vnp_TmnCode: VNP_TMN_CODE,
       vnp_Locale: "vn",
       vnp_CurrCode: "VND",
       vnp_TxnRef: orderId,
       vnp_OrderInfo: `Thanh toan don hang #${order.id}`,
       vnp_OrderType: "other",
       vnp_Amount: order.total * 100,
-      vnp_ReturnUrl: process.env.VNP_RETURN_URL,
-      vnp_IpAddr: req.ip || "127.0.0.1",
+      vnp_ReturnUrl: VNP_RETURN_URL,
+      vnp_IpAddr: ipAddr,
       vnp_CreateDate: createDate,
     };
 
     const sortedParams = sortObject(vnpParams);
     const signData = new URLSearchParams(sortedParams).toString();
-    if (!process.env.VNP_TMN_CODE || !process.env.VNP_HASH_SECRET || !process.env.VNP_URL) {
-      // VNPay sandbox keys not yet configured in environment
-      // Automatically keep order as CONFIRMED (COD fallback)
-      await pool.query("UPDATE orders SET payment_method = 'COD', status = 'CONFIRMED' WHERE id = $1", [order.id]);
-      return res.status(200).json({ 
-        fallbackCod: true, 
-        message: "Cổng thanh toán VNPay chưa được cấu hình khóa bí mật. Đơn hàng đã được tự động chuyển sang Thanh toán khi nhận hàng (COD)." 
-      });
-    }
-
-    const hmac = crypto.createHmac("sha512", process.env.VNP_HASH_SECRET);
+    const hmac = crypto.createHmac("sha512", VNP_HASH_SECRET);
     const signed = hmac.update(Buffer.from(signData, "utf-8")).digest("hex");
 
     sortedParams["vnp_SecureHash"] = signed;
-    const paymentUrl = `${process.env.VNP_URL}?${new URLSearchParams(sortedParams).toString()}`;
+    const paymentUrl = `${VNP_URL}?${new URLSearchParams(sortedParams).toString()}`;
 
     // Save payment ref
     await pool.query("UPDATE orders SET payment_ref = $1 WHERE id = $2", [orderId, order.id]);
@@ -74,7 +77,7 @@ router.post("/create", authMiddleware, async (req, res) => {
     res.json({ paymentUrl });
   } catch (err) {
     console.error("VNPay create error:", err);
-    res.status(500).json({ error: "Lỗi tạo thanh toán VNPay" });
+    res.status(500).json({ error: "Lỗi tạo thanh toán VNPay: " + (err.message || "") });
   }
 });
 
@@ -88,7 +91,7 @@ router.get("/return", async (req, res) => {
 
     const sortedParams = sortObject(vnpParams);
     const signData = new URLSearchParams(sortedParams).toString();
-    const hmac = crypto.createHmac("sha512", process.env.VNP_HASH_SECRET);
+    const hmac = crypto.createHmac("sha512", VNP_HASH_SECRET);
     const checkSum = hmac.update(Buffer.from(signData, "utf-8")).digest("hex");
 
     const txnRef = vnpParams["vnp_TxnRef"];
@@ -104,7 +107,7 @@ router.get("/return", async (req, res) => {
       if (orderResult.rows.length > 0) {
         const order = orderResult.rows[0];
         if (responseCode === "00") {
-          await pool.query("UPDATE orders SET status = 'PAID' WHERE id = $1", [order.id]);
+          await pool.query("UPDATE orders SET status = 'CONFIRMED' WHERE id = $1", [order.id]);
 
           // Send confirmation email
           try {
@@ -122,7 +125,7 @@ router.get("/return", async (req, res) => {
             console.error("Order email failed:", e.message);
           }
 
-          res.redirect(`${process.env.CLIENT_URL}/payment/success?orderId=${order.id}`);
+          res.redirect(`${CLIENT_URL}/payment/success?orderId=${order.id}`);
         } else {
           await pool.query("UPDATE orders SET status = 'CANCELLED' WHERE id = $1", [order.id]);
           // Restore stock
@@ -130,17 +133,17 @@ router.get("/return", async (req, res) => {
           for (const item of items.rows) {
             await pool.query("UPDATE comics SET stock = stock + $1 WHERE id = $2", [item.quantity, item.comic_id]);
           }
-          res.redirect(`${process.env.CLIENT_URL}/payment/failed?orderId=${order.id}`);
+          res.redirect(`${CLIENT_URL}/payment/failed?orderId=${order.id}`);
         }
       } else {
-        res.redirect(`${process.env.CLIENT_URL}/payment/failed`);
+        res.redirect(`${CLIENT_URL}/payment/failed`);
       }
     } else {
-      res.redirect(`${process.env.CLIENT_URL}/payment/failed`);
+      res.redirect(`${CLIENT_URL}/payment/failed`);
     }
   } catch (err) {
     console.error("VNPay return error:", err);
-    res.redirect(`${process.env.CLIENT_URL}/payment/failed`);
+    res.redirect(`${CLIENT_URL}/payment/failed`);
   }
 });
 

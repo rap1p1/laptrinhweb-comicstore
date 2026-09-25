@@ -26,6 +26,7 @@ export default function ProfilePage() {
   const [verifyError, setVerifyError] = useState("");
 
   // Password change state
+  const [hasPassword, setHasPassword] = useState<boolean>(true);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -48,6 +49,7 @@ export default function ProfilePage() {
       setPhone(data.phone || "");
       setAddress(data.address || "");
       setAvatar(data.avatar || "");
+      setHasPassword(data.has_password !== undefined ? !!data.has_password : !data.google_id);
     } catch (err: any) {
       console.error("Load profile failed:", err);
     } finally {
@@ -126,11 +128,11 @@ export default function ProfilePage() {
     e.preventDefault();
     setPwErrorMsg("");
     setPwSuccessMsg("");
-    if (!currentPassword || !newPassword) {
-      setPwErrorMsg("Vui lòng nhập đầy đủ mật khẩu");
+    if (hasPassword && !currentPassword) {
+      setPwErrorMsg("Vui lòng nhập mật khẩu hiện tại");
       return;
     }
-    if (newPassword.length < 6) {
+    if (!newPassword || newPassword.length < 6) {
       setPwErrorMsg("Mật khẩu mới tối thiểu 6 ký tự");
       return;
     }
@@ -141,8 +143,9 @@ export default function ProfilePage() {
 
     setPwSaving(true);
     try {
-      await api.changePassword(currentPassword, newPassword);
-      setPwSuccessMsg("Đổi mật khẩu thành công!");
+      const res = await api.changePassword(currentPassword, newPassword);
+      setHasPassword(true);
+      setPwSuccessMsg(res?.message || (hasPassword ? "Đổi mật khẩu thành công!" : "Thiết lập mật khẩu thành công!"));
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -348,25 +351,30 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Change Password Card (Only if user has password) */}
-          {!user?.google_id && (
-            <div className="bg-white border border-black/10 p-6 shadow-xs">
-              <h3 className="font-display text-sm font-black uppercase mb-4 pb-2 border-b border-black/10">
-                Đổi mật khẩu
-              </h3>
+          {/* Change or Set Password Card for All Users */}
+          <div className="bg-white border border-black/10 p-6 shadow-xs">
+            <h3 className="font-display text-sm font-black uppercase mb-1 pb-2 border-b border-black/10">
+              {hasPassword ? "Đổi mật khẩu" : "Thiết lập mật khẩu đăng nhập"}
+            </h3>
+            {!hasPassword && (
+              <p className="text-[11px] text-black/50 mb-3">
+                Tài khoản Google của bạn chưa có mật khẩu. Bạn có thể thiết lập mật khẩu để đăng nhập trực tiếp bằng email & mật khẩu.
+              </p>
+            )}
 
-              {pwSuccessMsg && (
-                <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-2.5 rounded">
-                  {pwSuccessMsg}
-                </div>
-              )}
-              {pwErrorMsg && (
-                <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs p-2.5 rounded">
-                  {pwErrorMsg}
-                </div>
-              )}
+            {pwSuccessMsg && (
+              <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-2.5 rounded">
+                {pwSuccessMsg}
+              </div>
+            )}
+            {pwErrorMsg && (
+              <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs p-2.5 rounded">
+                {pwErrorMsg}
+              </div>
+            )}
 
-              <form onSubmit={handleChangePassword} className="space-y-3">
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              {hasPassword && (
                 <div>
                   <label className="text-[11px] font-bold uppercase text-black/60 block mb-1">Mật khẩu hiện tại</label>
                   <input
@@ -377,36 +385,38 @@ export default function ProfilePage() {
                     className="w-full border border-black/20 px-3 py-2 text-xs outline-none focus:border-[#e51c2a]"
                   />
                 </div>
-                <div>
-                  <label className="text-[11px] font-bold uppercase text-black/60 block mb-1">Mật khẩu mới</label>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full border border-black/20 px-3 py-2 text-xs outline-none focus:border-[#e51c2a]"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold uppercase text-black/60 block mb-1">Xác nhận mật khẩu</label>
-                  <input
-                    type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full border border-black/20 px-3 py-2 text-xs outline-none focus:border-[#e51c2a]"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={pwSaving}
-                  className="w-full mt-2 border border-black text-black hover:bg-black hover:text-white py-2 text-xs font-bold uppercase tracking-wider transition disabled:opacity-50"
-                >
-                  {pwSaving ? "Đang xử lý..." : "Cập nhật mật khẩu"}
-                </button>
-              </form>
-            </div>
-          )}
+              )}
+              <div>
+                <label className="text-[11px] font-bold uppercase text-black/60 block mb-1">Mật khẩu mới</label>
+                <input
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Tối thiểu 6 ký tự"
+                  className="w-full border border-black/20 px-3 py-2 text-xs outline-none focus:border-[#e51c2a]"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase text-black/60 block mb-1">Xác nhận mật khẩu mới</label>
+                <input
+                  type="password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Nhập lại mật khẩu mới"
+                  className="w-full border border-black/20 px-3 py-2 text-xs outline-none focus:border-[#e51c2a]"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={pwSaving}
+                className="w-full mt-2 border border-black text-black hover:bg-black hover:text-white py-2 text-xs font-bold uppercase tracking-wider transition disabled:opacity-50"
+              >
+                {pwSaving ? "Đang xử lý..." : hasPassword ? "Cập nhật mật khẩu" : "Thiết lập mật khẩu"}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
 
