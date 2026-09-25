@@ -150,13 +150,13 @@ export default function ComicForm() {
 
         <div>
           <label className="text-xs font-bold tracking-wider uppercase text-black/60 block mb-2">Nhân vật (phân tách bằng dấu phẩy)</label>
-          <input value={form.characters} onChange={(e) => update("characters", e.target.value)} className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a]" placeholder="Luffy, Zoro, Nami" />
+          <input value={form.characters} onChange={(e) => update("characters", e.target.value)} className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a]" placeholder="Spider-Man, Iron Man, Captain America" />
         </div>
 
         <div className="grid sm:grid-cols-4 gap-5">
           <div>
             <label className="text-xs font-bold tracking-wider uppercase text-black/60 block mb-2">Ký hiệu bìa</label>
-            <input value={form.mark} onChange={(e) => update("mark", e.target.value)} className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a]" placeholder="ONE PIECE" />
+            <input value={form.mark} onChange={(e) => update("mark", e.target.value)} className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a]" placeholder="MARVEL" />
           </div>
           <div>
             <label className="text-xs font-bold tracking-wider uppercase text-black/60 block mb-2">Badge</label>

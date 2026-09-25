@@ -11,7 +11,16 @@ router.get("/", optionalAuth, async (req, res) => {
     const offset = (page - 1) * limit;
     let query = `
       SELECT c.*, 
-        COALESCE(json_agg(DISTINCT cc.character_name) FILTER (WHERE cc.character_name IS NOT NULL), '[]') as characters
+        COALESCE(json_agg(DISTINCT cc.character_name) FILTER (WHERE cc.character_name IS NOT NULL), '[]') as characters,
+        COALESCE(
+          json_agg(
+            DISTINCT jsonb_build_object(
+              'name', cc.character_name,
+              'wiki_url', COALESCE(cc.wiki_url, 'https://en.wikipedia.org/wiki/' || replace(cc.character_name, ' ', '_'))
+            )
+          ) FILTER (WHERE cc.character_name IS NOT NULL),
+          '[]'
+        ) as character_details
       FROM comics c
       LEFT JOIN comic_characters cc ON c.id = cc.comic_id
       WHERE c.status = 'APPROVED'
@@ -69,6 +78,15 @@ router.get("/:id", async (req, res) => {
     const result = await pool.query(
       `SELECT c.*, 
         COALESCE(json_agg(DISTINCT cc.character_name) FILTER (WHERE cc.character_name IS NOT NULL), '[]') as characters,
+        COALESCE(
+          json_agg(
+            DISTINCT jsonb_build_object(
+              'name', cc.character_name,
+              'wiki_url', COALESCE(cc.wiki_url, 'https://en.wikipedia.org/wiki/' || replace(cc.character_name, ' ', '_'))
+            )
+          ) FILTER (WHERE cc.character_name IS NOT NULL),
+          '[]'
+        ) as character_details,
         u.name as creator_name
       FROM comics c
       LEFT JOIN comic_characters cc ON c.id = cc.comic_id
@@ -106,9 +124,11 @@ router.post("/", authMiddleware, requireRole("PUBLISHER", "SYSTEM_ADMIN"), async
     // Insert characters
     if (characters && characters.length > 0) {
       for (const char of characters) {
+        const charName = typeof char === 'object' ? char.name : char;
+        const wikiUrl = typeof char === 'object' ? char.wiki_url : null;
         await pool.query(
-          "INSERT INTO comic_characters (comic_id, character_name) VALUES ($1, $2)",
-          [comic.id, char]
+          "INSERT INTO comic_characters (comic_id, character_name, wiki_url) VALUES ($1, $2, $3)",
+          [comic.id, charName, wikiUrl]
         );
       }
     }
@@ -143,7 +163,12 @@ router.put("/:id", authMiddleware, requireRole("PUBLISHER", "SYSTEM_ADMIN"), asy
     await pool.query("DELETE FROM comic_characters WHERE comic_id = $1", [id]);
     if (characters && characters.length > 0) {
       for (const char of characters) {
-        await pool.query("INSERT INTO comic_characters (comic_id, character_name) VALUES ($1, $2)", [id, char]);
+        const charName = typeof char === 'object' ? char.name : char;
+        const wikiUrl = typeof char === 'object' ? char.wiki_url : null;
+        await pool.query(
+          "INSERT INTO comic_characters (comic_id, character_name, wiki_url) VALUES ($1, $2, $3)",
+          [id, charName, wikiUrl]
+        );
       }
     }
 

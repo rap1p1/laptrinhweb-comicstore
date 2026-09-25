@@ -135,7 +135,7 @@ export default function Layout() {
           <div className="grid gap-8 md:grid-cols-3">
             <div>
               <h3 className="font-display text-2xl font-black tracking-[-.03em] mb-4">PANEL<span className="text-[#e51c2a]">.</span></h3>
-              <p className="text-sm text-white/50 leading-6">Cửa hàng truyện tranh trực tuyến. Sưu tầm những bộ truyện yêu thích với giá tốt nhất.</p>
+              <p className="text-sm text-white/50 leading-6">Cửa hàng truyện tranh Marvel Comics trực tuyến. Sưu tầm những tập truyện Marvel đỉnh cao với giá tốt nhất.</p>
             </div>
             <div>
               <h4 className="text-xs font-bold tracking-[.15em] uppercase text-white/70 mb-4">Thông tin liên hệ</h4>

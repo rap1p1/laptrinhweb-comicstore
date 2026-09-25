@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS comics (
 CREATE TABLE IF NOT EXISTS comic_characters (
   id SERIAL PRIMARY KEY,
   comic_id INTEGER REFERENCES comics(id) ON DELETE CASCADE,
-  character_name VARCHAR(100) NOT NULL
+  character_name VARCHAR(100) NOT NULL,
+  wiki_url VARCHAR(512)
 );
 
 CREATE TABLE IF NOT EXISTS cart_items (
@@ -91,6 +92,7 @@ CREATE INDEX IF NOT EXISTS idx_otp_user ON otp_codes(user_id);
 export async function initDB() {
   try {
     await pool.query(schema);
+    await pool.query("ALTER TABLE comic_characters ADD COLUMN IF NOT EXISTS wiki_url VARCHAR(512)");
     console.log("✅ Database schema initialized");
   } catch (err) {
     console.error("❌ Database init error:", err.message);

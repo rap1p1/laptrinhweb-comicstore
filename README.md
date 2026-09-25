@@ -12,11 +12,11 @@
 
 ## Mô tả dự án
 
-**PANEL.** là một cửa hàng truyện tranh trực tuyến với đầy đủ tính năng e-commerce, hệ thống quản lý nội dung với quy trình phê duyệt, và tích hợp thanh toán VNPay.
+**PANEL.** là một cửa hàng truyện tranh Marvel comic trực tuyến với đầy đủ tính năng e-commerce, tra cứu Wiki nhân vật Marvel, hệ thống quản lý nội dung với quy trình phê duyệt, và tích hợp thanh toán VNPay.
 
 ### Tính năng chính
 
-- **Mua sắm truyện tranh** — Duyệt, tìm kiếm, lọc theo nhân vật
+- **Mua sắm truyện tranh Marvel** — Duyệt, tìm kiếm, lọc theo nhân vật, xem thông tin Wiki nhân vật
 - **Giỏ hàng** — Thêm, sửa số lượng, xóa sản phẩm
 - **Thanh toán** — COD hoặc VNPay sandbox
 - **Xác nhận đơn hàng** — Gửi email qua Gmail SMTP
@@ -198,4 +198,4 @@ laptrinhweb-comicstore/
 
 ---
 
-(c) 2025 PANEL. Comic Store — Đồ án Lập trình Web, PTIT HCM
+(c) 2026 PANEL. Comic Store — Đồ án Lập trình Web, PTIT HCM
