@@ -114,6 +114,11 @@ export default function HomePage() {
       window.location.href = "/login";
       return;
     }
+    if (user.role !== "BUYER") {
+      setToast("Chỉ tài khoản người mua (BUYER) mới có thể thêm giỏ hàng và đặt hàng");
+      setTimeout(() => setToast(""), 3000);
+      return;
+    }
     try {
       setAddingToCart(comicId);
       await api.addToCart(comicId);

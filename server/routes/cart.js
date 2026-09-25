@@ -27,6 +27,10 @@ router.get("/", authMiddleware, async (req, res) => {
 
 // Add to cart
 router.post("/", authMiddleware, async (req, res) => {
+  if (req.user.role !== "BUYER") {
+    return res.status(403).json({ error: "Chỉ tài khoản người mua (BUYER) mới có thể sử dụng giỏ hàng và đặt hàng" });
+  }
+
   try {
     const { comic_id, quantity = 1 } = req.body;
 

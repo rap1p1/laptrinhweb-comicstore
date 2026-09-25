@@ -281,8 +281,10 @@ export default function DashboardPage() {
                       <span className="font-bold">{comic.title}</span>
                     </div>
                     <div className="flex items-center gap-6">
-                      <span className="text-xs text-black/50">{comic.total_sold} cuốn đã bán</span>
-                      <span className="font-bold text-[#e51c2a]">{money.format(comic.total_revenue)}</span>
+                      <span className="text-xs text-black/50 font-medium">
+                        <strong className="text-black font-bold">{comic.total_sold ?? comic.sold ?? 0}</strong> cuốn đã bán
+                      </span>
+                      <span className="font-bold text-[#e51c2a]">{money.format(Number(comic.total_revenue ?? comic.revenue ?? 0))}</span>
                     </div>
                   </div>
                 ))}

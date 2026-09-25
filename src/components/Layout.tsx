@@ -53,10 +53,13 @@ export default function Layout() {
             {user && (user.role === "MANAGER" || user.role === "SYSTEM_ADMIN") && (
               <Link to="/dashboard" className="py-1 hover:text-[#e51c2a]">Quản lý</Link>
             )}
+            {user && user.role === "SYSTEM_ADMIN" && (
+              <Link to="/manage/users" className="py-1 hover:text-[#e51c2a]">Quản lý tài khoản</Link>
+            )}
             {user && user.role === "PUBLISHER" && (
               <Link to="/publisher/comics" className="py-1 hover:text-[#e51c2a]">Truyện của tôi</Link>
             )}
-            {user && (
+            {user && user.role === "BUYER" && (
               <Link to="/my-orders" className="py-1 hover:text-[#e51c2a]">Đơn hàng</Link>
             )}
           </nav>
@@ -67,10 +70,12 @@ export default function Layout() {
             <button onClick={() => setShowSearch(!showSearch)} aria-label="Tìm kiếm"><Icon name="search" /></button>
             {user ? (
               <>
-                <Link to="/cart" className="relative" aria-label={`Giỏ hàng, ${cartCount} sản phẩm`}>
-                  <Icon name="bag" />
-                  {cartCount > 0 && <span className="absolute -right-2 -top-2 grid size-4 place-items-center rounded-full bg-[#e51c2a] text-[9px] font-bold text-white">{cartCount}</span>}
-                </Link>
+                {user.role === "BUYER" && (
+                  <Link to="/cart" className="relative" aria-label={`Giỏ hàng, ${cartCount} sản phẩm`}>
+                    <Icon name="bag" />
+                    {cartCount > 0 && <span className="absolute -right-2 -top-2 grid size-4 place-items-center rounded-full bg-[#e51c2a] text-[9px] font-bold text-white">{cartCount}</span>}
+                  </Link>
+                )}
                 <div className="relative">
                   <button onClick={() => setShowUserMenu(!showUserMenu)} className="flex items-center gap-2">
                     {user.avatar ? (
@@ -92,12 +97,19 @@ export default function Layout() {
                             <Icon name="dashboard" className="size-4" /> Dashboard
                           </button>
                         )}
+                        {user.role === "SYSTEM_ADMIN" && (
+                          <button onClick={() => { navigate("/manage/users"); setShowUserMenu(false); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-black/5 transition text-[#e51c2a] font-bold">
+                            <Icon name="user" className="size-4" /> Quản lý tài khoản
+                          </button>
+                        )}
                         <button onClick={() => { navigate("/profile"); setShowUserMenu(false); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-black/5 transition">
                           <Icon name="user" className="size-4" /> Cài đặt & Hồ sơ
                         </button>
-                        <button onClick={() => { navigate("/my-orders"); setShowUserMenu(false); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-black/5 transition">
-                          <Icon name="order" className="size-4" /> Đơn hàng của tôi
-                        </button>
+                        {user.role === "BUYER" && (
+                          <button onClick={() => { navigate("/my-orders"); setShowUserMenu(false); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-black/5 transition">
+                            <Icon name="order" className="size-4" /> Đơn hàng của tôi
+                          </button>
+                        )}
                         <button onClick={() => { logout(); setShowUserMenu(false); navigate("/"); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition">
                           <Icon name="logout" className="size-4" /> Đăng xuất
                         </button>
@@ -119,10 +131,15 @@ export default function Layout() {
             <Link to="/" onClick={() => setMobileMenu(false)} className="block py-2 text-sm font-bold">Truyện tranh</Link>
             {user && (
               <>
-                <Link to="/cart" onClick={() => setMobileMenu(false)} className="block py-2 text-sm font-bold">Giỏ hàng ({cartCount})</Link>
-                <Link to="/my-orders" onClick={() => setMobileMenu(false)} className="block py-2 text-sm font-bold">Đơn hàng</Link>
+                {user.role === "BUYER" && (
+                  <>
+                    <Link to="/cart" onClick={() => setMobileMenu(false)} className="block py-2 text-sm font-bold">Giỏ hàng ({cartCount})</Link>
+                    <Link to="/my-orders" onClick={() => setMobileMenu(false)} className="block py-2 text-sm font-bold">Đơn hàng</Link>
+                  </>
+                )}
                 {user.role === "PUBLISHER" && <Link to="/publisher/comics" onClick={() => setMobileMenu(false)} className="block py-2 text-sm font-bold">Truyện của tôi</Link>}
                 {(user.role === "MANAGER" || user.role === "SYSTEM_ADMIN") && <Link to="/dashboard" onClick={() => setMobileMenu(false)} className="block py-2 text-sm font-bold">Dashboard</Link>}
+                {user.role === "SYSTEM_ADMIN" && <Link to="/manage/users" onClick={() => setMobileMenu(false)} className="block py-2 text-sm font-bold text-[#e51c2a]">Quản lý tài khoản</Link>}
               </>
             )}
           </div>

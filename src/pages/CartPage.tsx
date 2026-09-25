@@ -13,6 +13,10 @@ export default function CartPage() {
 
   useEffect(() => {
     if (!user) { navigate("/login"); return; }
+    if (user.role !== "BUYER") {
+      navigate(user.role === "PUBLISHER" ? "/publisher/comics" : "/dashboard");
+      return;
+    }
     loadCart();
   }, [user]);
 

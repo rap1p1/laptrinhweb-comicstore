@@ -8,6 +8,10 @@ const router = Router();
 
 // Create order from cart
 router.post("/", authMiddleware, async (req, res) => {
+  if (req.user.role !== "BUYER") {
+    return res.status(403).json({ error: "Chỉ tài khoản người mua (BUYER) mới có quyền đặt hàng" });
+  }
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -93,6 +97,10 @@ router.post("/", authMiddleware, async (req, res) => {
 
 // Get my orders
 router.get("/my-orders", authMiddleware, async (req, res) => {
+  if (req.user.role !== "BUYER") {
+    return res.status(403).json({ error: "Chỉ tài khoản người mua mới có lịch sử đơn hàng cá nhân" });
+  }
+
   try {
     const result = await pool.query(
       `SELECT o.*, 

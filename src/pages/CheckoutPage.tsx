@@ -19,6 +19,10 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!user) { navigate("/login"); return; }
+    if (user.role !== "BUYER") {
+      navigate(user.role === "PUBLISHER" ? "/publisher/comics" : "/dashboard");
+      return;
+    }
     if (user.name && !name) setName(user.name);
     if (user.phone && !phone) setPhone(user.phone);
     if (user.address && !address) setAddress(user.address);

@@ -11,7 +11,19 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { user, setUser } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      if (user.role === "SYSTEM_ADMIN" || user.role === "MANAGER") {
+        navigate("/dashboard");
+      } else if (user.role === "PUBLISHER") {
+        navigate("/publisher/comics");
+      } else {
+        navigate("/");
+      }
+    }
+  }, [user]);
 
   const handleQuickLogin = async (demoEmail: string, demoPass: string) => {
     setEmail(demoEmail);
@@ -44,7 +56,13 @@ export default function LoginPage() {
       const data = await api.login(email, password);
       api.setAuth(data.token, data.user);
       setUser(data.user);
-      navigate("/");
+      if (data.user.role === "SYSTEM_ADMIN" || data.user.role === "MANAGER") {
+        navigate("/dashboard");
+      } else if (data.user.role === "PUBLISHER") {
+        navigate("/publisher/comics");
+      } else {
+        navigate("/");
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -66,14 +84,19 @@ export default function LoginPage() {
               setError("");
               const data = await api.googleLogin(response.credential);
               api.setAuth(data.token, data.user);
-              if (data.isNewUser || !data.user?.phone || !data.user?.address) {
-                navigate("/profile?onboarding=true");
+              setUser(data.user);
+
+              if (data.user?.role === "SYSTEM_ADMIN" || data.user?.role === "MANAGER") {
+                window.location.href = "/dashboard";
+              } else if (data.user?.role === "PUBLISHER") {
+                window.location.href = "/publisher/comics";
+              } else if (data.isNewUser || !data.user?.phone || !data.user?.address) {
+                window.location.href = "/profile?onboarding=true";
               } else {
-                navigate("/");
+                window.location.href = "/";
               }
             } catch (err: any) {
               setError(err.message || "Đăng nhập Google thất bại");
-            } finally {
               setLoading(false);
             }
           },

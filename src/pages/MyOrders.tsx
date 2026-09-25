@@ -27,6 +27,10 @@ export default function MyOrders() {
 
   useEffect(() => {
     if (!user) { navigate("/login"); return; }
+    if (user.role !== "BUYER") {
+      navigate(user.role === "PUBLISHER" ? "/publisher/comics" : "/dashboard");
+      return;
+    }
     loadOrders();
   }, [user]);
 

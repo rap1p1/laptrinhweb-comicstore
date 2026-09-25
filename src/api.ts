@@ -91,6 +91,7 @@ export const api = {
   // Users
   getUsers: () => request("/users"),
   updateUserRole: (id: number, role: string) => request(`/users/${id}/role`, { method: "PATCH", body: JSON.stringify({ role }) }),
+  updateUser: (id: number, data: any) => request(`/users/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteUser: (id: number) => request(`/users/${id}`, { method: "DELETE" }),
   createUser: (data: any) => request("/users", { method: "POST", body: JSON.stringify(data) }),
   getStats: () => request("/users/stats"),
