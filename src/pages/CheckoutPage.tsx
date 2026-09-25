@@ -61,11 +61,12 @@ export default function CheckoutPage() {
             window.location.href = res.paymentUrl;
             return;
           }
-          // If fallbackCod returned or no URL
-          navigate(`/payment/success?orderId=${order.id}&notice=vnpay_fallback`);
+          throw new Error("Không nhận được liên kết thanh toán từ cổng VNPay");
         } catch (vnpErr: any) {
-          console.warn("VNPay error, fallback to COD:", vnpErr);
-          navigate(`/payment/success?orderId=${order.id}&notice=vnpay_fallback`);
+          console.error("VNPay error:", vnpErr);
+          setError(vnpErr.message || "Không thể kết nối cổng VNPay. Vui lòng thử lại");
+          setSubmitting(false);
+          return;
         }
       } else {
         navigate(`/payment/success?orderId=${order.id}`);

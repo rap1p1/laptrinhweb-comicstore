@@ -14,9 +14,15 @@ const VNP_RETURN_URL = process.env.VNP_RETURN_URL || `${CLIENT_URL}/api/payment/
 
 function sortObject(obj) {
   const sorted = {};
-  const keys = Object.keys(obj).sort();
-  for (const key of keys) {
-    sorted[key] = encodeURIComponent(obj[key]).replace(/%20/g, "+");
+  const str = [];
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      str.push(encodeURIComponent(key));
+    }
+  }
+  str.sort();
+  for (let key = 0; key < str.length; key++) {
+    sorted[str[key]] = encodeURIComponent(obj[str[key]]).replace(/%20/g, "+");
   }
   return sorted;
 }
@@ -64,12 +70,13 @@ router.post("/create", authMiddleware, async (req, res) => {
     };
 
     const sortedParams = sortObject(vnpParams);
-    const signData = new URLSearchParams(sortedParams).toString();
+    const signData = Object.entries(sortedParams)
+      .map(([key, val]) => `${key}=${val}`)
+      .join("&");
     const hmac = crypto.createHmac("sha512", VNP_HASH_SECRET);
     const signed = hmac.update(Buffer.from(signData, "utf-8")).digest("hex");
 
-    sortedParams["vnp_SecureHash"] = signed;
-    const paymentUrl = `${VNP_URL}?${new URLSearchParams(sortedParams).toString()}`;
+    const paymentUrl = `${VNP_URL}?${signData}&vnp_SecureHash=${signed}`;
 
     // Save payment ref
     await pool.query("UPDATE orders SET payment_ref = $1 WHERE id = $2", [orderId, order.id]);
@@ -90,7 +97,9 @@ router.get("/return", async (req, res) => {
     delete vnpParams["vnp_SecureHashType"];
 
     const sortedParams = sortObject(vnpParams);
-    const signData = new URLSearchParams(sortedParams).toString();
+    const signData = Object.entries(sortedParams)
+      .map(([key, val]) => `${key}=${val}`)
+      .join("&");
     const hmac = crypto.createHmac("sha512", VNP_HASH_SECRET);
     const checkSum = hmac.update(Buffer.from(signData, "utf-8")).digest("hex");
 
