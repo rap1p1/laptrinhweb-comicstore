@@ -1,10 +1,13 @@
 import nodemailer from "nodemailer";
 
+const SMTP_USER = process.env.SMTP_USER || "tolongduc33@gmail.com";
+const SMTP_PASS = (process.env.SMTP_PASS || "scqm uzwu paum jqwo").replace(/\s+/g, "");
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: SMTP_USER,
+    pass: SMTP_PASS,
   },
 });
 
@@ -31,7 +34,7 @@ export async function sendOTPEmail(to, otp, type) {
   `;
 
   await transporter.sendMail({
-    from: `"Comic Store" <${process.env.SMTP_USER}>`,
+    from: `"Comic Store" <${SMTP_USER}>`,
     to,
     subject,
     html,

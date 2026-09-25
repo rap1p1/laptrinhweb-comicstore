@@ -178,10 +178,12 @@ router.post("/verify-email", authMiddleware, async (req, res) => {
 router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
-    const result = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: "Vui lòng nhập địa chỉ email" });
+    }
+    const result = await pool.query("SELECT id FROM users WHERE email = $1", [email.trim()]);
     if (result.rows.length === 0) {
-      // Don't reveal if email exists
-      return res.json({ message: "Nếu email tồn tại, mã OTP đã được gửi" });
+      return res.status(404).json({ error: "Email này chưa được đăng ký trong hệ thống" });
     }
 
     const otp = generateOTP();
@@ -190,11 +192,17 @@ router.post("/forgot-password", async (req, res) => {
       [result.rows[0].id, otp]
     );
 
-    await sendOTPEmail(email, otp, "PASSWORD_RESET");
-    res.json({ message: "Mã OTP đã được gửi đến email" });
+    try {
+      await sendOTPEmail(email.trim(), otp, "PASSWORD_RESET");
+    } catch (e) {
+      console.error("Failed to send OTP email:", e.message);
+      return res.status(500).json({ error: "Không thể gửi email OTP: " + e.message });
+    }
+
+    res.json({ message: "Mã OTP đã được gửi đến email của bạn" });
   } catch (err) {
     console.error("Forgot password error:", err);
-    res.status(500).json({ error: "Lỗi server" });
+    res.status(500).json({ error: "Lỗi server: " + (err.message || "") });
   }
 });
 

@@ -18,6 +18,13 @@ export default function ProfilePage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Email verification state
+  const [showVerifyModal, setShowVerifyModal] = useState(searchParams.get("verify") === "true");
+  const [verifyOtp, setVerifyOtp] = useState("");
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verifySuccess, setVerifySuccess] = useState("");
+  const [verifyError, setVerifyError] = useState("");
+
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -74,6 +81,44 @@ export default function ProfilePage() {
       setErrorMsg(err.message || "Lỗi khi cập nhật thông tin");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleStartEmailVerify = async () => {
+    setVerifyError("");
+    setVerifySuccess("");
+    setVerifyLoading(true);
+    try {
+      await api.resendOtp("EMAIL_VERIFY");
+      setVerifySuccess(`Mã OTP đã được gửi đến email ${user?.email}. Vui lòng kiểm tra hộp thư.`);
+      setShowVerifyModal(true);
+    } catch (err: any) {
+      setVerifyError(err.message || "Không thể gửi mã OTP xác thực");
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
+
+  const handleSubmitVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verifyOtp.trim()) return;
+    setVerifyLoading(true);
+    setVerifyError("");
+    setVerifySuccess("");
+    try {
+      await api.verifyEmail(verifyOtp.trim());
+      const freshUser = await api.me();
+      api.setAuth(api.getToken() || "", freshUser);
+      setUser(freshUser);
+      setVerifySuccess("Xác thực email thành công!");
+      setTimeout(() => {
+        setShowVerifyModal(false);
+        setVerifyOtp("");
+      }, 1500);
+    } catch (err: any) {
+      setVerifyError(err.message || "Mã OTP không hợp lệ hoặc đã hết hạn");
+    } finally {
+      setVerifyLoading(false);
     }
   };
 
@@ -178,16 +223,31 @@ export default function ProfilePage() {
 
           <form onSubmit={handleSaveProfile} className="space-y-5">
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-black/60 block mb-2">
-                Email đăng ký
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-black/60">
+                  Email đăng ký
+                </label>
+                {user?.is_verified ? (
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    ✓ Đã xác thực
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleStartEmailVerify}
+                    className="text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full transition"
+                  >
+                    ⚠️ Chưa xác thực — Xác thực ngay
+                  </button>
+                )}
+              </div>
               <input
                 type="email"
                 value={user?.email || ""}
                 disabled
                 className="w-full border border-black/15 bg-neutral-100 px-4 py-2.5 text-sm text-black/60 outline-none cursor-not-allowed"
               />
-              <span className="text-[11px] text-black/40 mt-1 block">Email dùng để đăng nhập và không thể thay đổi</span>
+              <span className="text-[11px] text-black/40 mt-1 block">Email dùng để đăng nhập và nhận thông báo đơn hàng</span>
             </div>
 
             <div>
@@ -275,6 +335,14 @@ export default function ProfilePage() {
             <p className="font-display text-lg font-black">{name || "Chưa đặt tên"}</p>
             <p className="text-xs text-black/50 mb-3">{user?.email}</p>
             <div className="pt-3 border-t border-black/10 text-xs text-black/60 flex justify-between">
+              <span>Trạng thái email:</span>
+              {user?.is_verified ? (
+                <span className="text-emerald-700 font-bold">Đã xác thực</span>
+              ) : (
+                <span className="text-amber-700 font-bold">Chưa xác thực</span>
+              )}
+            </div>
+            <div className="pt-2 text-xs text-black/60 flex justify-between">
               <span>Vai trò:</span>
               <strong className="text-black">{roleText[user?.role] || user?.role}</strong>
             </div>
@@ -341,6 +409,70 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* Email Verification Modal */}
+      {showVerifyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white max-w-md w-full p-6 shadow-2xl border border-black/20">
+            <h3 className="font-display text-xl font-black uppercase mb-2">Xác thực địa chỉ Email</h3>
+            <p className="text-xs text-black/60 mb-4">
+              Mã OTP 6 số đã được gửi đến <strong>{user?.email}</strong>. Vui lòng nhập mã để hoàn tất xác thực tài khoản.
+            </p>
+
+            {verifySuccess && (
+              <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-3 rounded font-medium">
+                {verifySuccess}
+              </div>
+            )}
+            {verifyError && (
+              <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded font-medium">
+                {verifyError}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitVerify} className="space-y-4">
+              <div>
+                <input
+                  type="text"
+                  maxLength={6}
+                  required
+                  placeholder="000000"
+                  value={verifyOtp}
+                  onChange={(e) => setVerifyOtp(e.target.value)}
+                  className="w-full border-2 border-black/20 p-3 text-center text-3xl font-black tracking-[0.4em] outline-none focus:border-[#e51c2a]"
+                />
+              </div>
+
+              <div className="flex justify-between items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleStartEmailVerify}
+                  disabled={verifyLoading}
+                  className="text-xs font-bold text-black/60 hover:text-[#e51c2a]"
+                >
+                  Gửi lại mã
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowVerifyModal(false)}
+                    className="px-4 py-2 text-xs font-bold uppercase tracking-wider border border-black/20 hover:bg-black/5"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={verifyLoading || verifyOtp.length < 6}
+                    className="bg-[#e51c2a] hover:bg-black text-white px-5 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+                  >
+                    {verifyLoading ? "Đang xác nhận..." : "Xác thực"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
