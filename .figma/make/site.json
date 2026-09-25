@@ -1,0 +1,10 @@
+{
+  "description": "Discover and purchase Marvel comics with detailed previews, pricing, and character tags for easy browsing, perfect for comic enthusiasts.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

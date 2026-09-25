@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Manrope', sans-serif;
+  --font-display: 'Barlow Condensed', sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #f4f0e7;
+  font-family: 'Manrope', sans-serif;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+.cover-rays {
+  background:
+    conic-gradient(from 20deg at 65% 64%, transparent 0 8deg, var(--accent) 8deg 17deg, transparent 17deg 35deg, var(--accent) 35deg 46deg, transparent 46deg 72deg, var(--accent) 72deg 82deg, transparent 82deg 112deg, var(--accent) 112deg 123deg, transparent 123deg 360deg);
+}
+
+.halftone {
+  background-image: radial-gradient(var(--accent) 1.5px, transparent 1.5px);
+  background-size: 7px 7px;
+}
+
+.comic-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(255,255,255,.15), transparent 28%, transparent 75%, rgba(0,0,0,.28));
+  mix-blend-mode: overlay;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+::selection {
+  background: #e51c2a;
+  color: white;
+}
