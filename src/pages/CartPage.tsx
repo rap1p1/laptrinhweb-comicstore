@@ -1,24 +1,18 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../App";
-
-const money = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
+import { calculateCartTotal, calculateShippingFee, type CartItem } from "../cart";
+import { formatMoney } from "../formatMoney";
 
 export default function CartPage() {
-  const { user, refreshCart } = useAuth();
-  const [items, setItems] = useState<any[]>([]);
+  const { refreshCart } = useAuth();
+  const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) { navigate("/login"); return; }
-    if (user.role !== "BUYER") {
-      navigate(user.role === "PUBLISHER" ? "/publisher/comics" : "/dashboard");
-      return;
-    }
     loadCart();
-  }, [user]);
+  }, []);
 
   const loadCart = async () => {
     try {
@@ -51,7 +45,8 @@ export default function CartPage() {
     }
   };
 
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const total = calculateCartTotal(items);
+  const shipping = calculateShippingFee(total);
 
   if (loading) return <div className="py-20 text-center"><div className="inline-block size-8 border-3 border-black/20 border-t-[#e51c2a] rounded-full animate-spin" /></div>;
 
@@ -71,7 +66,7 @@ export default function CartPage() {
           <div className="space-y-4">
             {items.map((item) => (
               <div key={item.id} className="flex gap-5 border border-black/10 bg-white p-4">
-                <div className="shrink-0 w-20 h-28 overflow-hidden" style={{ backgroundColor: item.color }}>
+                <div className="shrink-0 w-20 h-28 overflow-hidden" style={{ backgroundColor: item.color ?? undefined }}>
                   {item.image_url ? (
                     <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" />
                   ) : (
@@ -83,7 +78,7 @@ export default function CartPage() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-display text-lg font-bold truncate">{item.title}</h3>
                   <p className="text-xs text-black/50">{item.issue}</p>
-                  <p className="text-sm font-bold mt-1">{money.format(item.price)}</p>
+                  <p className="text-sm font-bold mt-1">{formatMoney(item.price)}</p>
                   <div className="flex items-center gap-3 mt-3">
                     <button onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))} className="size-8 border border-black/20 grid place-items-center hover:bg-black hover:text-white transition text-sm font-bold">−</button>
                     <span className="text-sm font-bold w-8 text-center">{item.quantity}</span>
@@ -92,7 +87,7 @@ export default function CartPage() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="font-display text-lg font-black">{money.format(item.price * item.quantity)}</p>
+                  <p className="font-display text-lg font-black">{formatMoney(item.price * item.quantity)}</p>
                 </div>
               </div>
             ))}
@@ -101,16 +96,16 @@ export default function CartPage() {
           <div className="border border-black/10 bg-white p-6 h-fit sticky top-[90px]">
             <h3 className="font-display text-xl font-black mb-4">Tóm tắt đơn hàng</h3>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-black/60">Tạm tính ({items.length} sản phẩm)</span><span className="font-bold">{money.format(total)}</span></div>
-              <div className="flex justify-between"><span className="text-black/60">Phí vận chuyển</span><span className="font-bold text-green-600">{total >= 499000 ? "Miễn phí" : money.format(30000)}</span></div>
+              <div className="flex justify-between"><span className="text-black/60">Tạm tính ({items.length} sản phẩm)</span><span className="font-bold">{formatMoney(total)}</span></div>
+              <div className="flex justify-between"><span className="text-black/60">Phí vận chuyển</span><span className="font-bold text-green-600">{shipping === 0 ? "Miễn phí" : formatMoney(shipping)}</span></div>
             </div>
             <div className="border-t border-black/10 mt-4 pt-4 flex justify-between items-center">
               <span className="font-display text-lg font-black">Tổng cộng</span>
-              <span className="font-display text-2xl font-black text-[#e51c2a]">{money.format(total + (total >= 499000 ? 0 : 30000))}</span>
+              <span className="font-display text-2xl font-black text-[#e51c2a]">{formatMoney(total + shipping)}</span>
             </div>
-            <button onClick={() => navigate("/checkout")} className="w-full mt-4 bg-[#e51c2a] py-3.5 text-sm font-black tracking-wider text-white uppercase hover:bg-black transition">
+            <Link to="/checkout" className="block text-center w-full mt-4 bg-[#e51c2a] py-3.5 text-sm font-black tracking-wider text-white uppercase hover:bg-black transition">
               Thanh toán
-            </button>
+            </Link>
             <Link to="/" className="block text-center mt-3 text-xs text-black/50 font-bold hover:text-[#e51c2a]">← Tiếp tục mua sắm</Link>
           </div>
         </div>

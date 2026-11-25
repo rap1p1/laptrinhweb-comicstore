@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
-import { useAuth } from "../App";
 
 export default function ComicForm() {
-  const { user } = useAuth();
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
@@ -35,13 +33,9 @@ export default function ComicForm() {
   });
 
   useEffect(() => {
-    if (!user || (user.role !== "PUBLISHER" && user.role !== "SYSTEM_ADMIN")) {
-      navigate("/");
-      return;
-    }
     loadTags();
-    if (isEdit) loadComic();
-  }, [user, id]);
+    if (id) loadComic(Number(id));
+  }, [id]);
 
   const loadTags = async () => {
     try {
@@ -52,10 +46,10 @@ export default function ComicForm() {
     }
   };
 
-  const loadComic = async () => {
+  const loadComic = async (comicId: number) => {
     setLoading(true);
     try {
-      const comic = await api.getComic(parseInt(id!));
+      const comic = await api.getComic(comicId);
       setForm({
         title: comic.title || "",
         issue: comic.issue || "",
@@ -110,7 +104,7 @@ export default function ComicForm() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const saveComic = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (selectedChars.length === 0) {
@@ -119,27 +113,21 @@ export default function ComicForm() {
     }
     setSaving(true);
     try {
-      const data = {
-        title: form.title,
-        issue: form.issue,
+      // Các ô nhập trả về chuỗi. Chuyển những trường số trước khi gửi.
+      const comicData = {
+        ...form,
         price: parseInt(form.price),
         old_price: form.old_price ? parseInt(form.old_price) : null,
         publish_year: form.publish_year ? parseInt(form.publish_year) : 2024,
-        description: form.description,
-        preview: form.preview,
-        image_url: form.image_url,
-        color: form.color,
-        accent: form.accent,
-        mark: form.mark,
         badge: form.badge || null,
         stock: parseInt(form.stock) || 0,
         characters: selectedChars,
       };
 
-      if (isEdit) {
-        await api.updateComic(parseInt(id!), data);
+      if (id) {
+        await api.updateComic(Number(id), comicData);
       } else {
-        await api.createComic(data);
+        await api.createComic(comicData);
       }
       navigate("/publisher/comics");
     } catch (err: any) {
@@ -149,7 +137,9 @@ export default function ComicForm() {
     }
   };
 
-  const update = (key: string, value: string) => setForm({ ...form, [key]: value });
+  function updateField(field: keyof typeof form, value: string) {
+    setForm({ ...form, [field]: value });
+  }
 
   if (loading)
     return (
@@ -170,7 +160,7 @@ export default function ComicForm() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={saveComic} className="space-y-6">
         <div className="grid sm:grid-cols-2 gap-5">
           <div>
             <label className="text-xs font-bold tracking-wider uppercase text-black/60 block mb-2">
@@ -179,7 +169,7 @@ export default function ComicForm() {
             <input
               type="text"
               value={form.title}
-              onChange={(e) => update("title", e.target.value)}
+              onChange={(e) => updateField("title", e.target.value)}
               required
               className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a]"
               placeholder="Civil War, Spider-Man..."
@@ -192,7 +182,7 @@ export default function ComicForm() {
             <input
               type="text"
               value={form.issue}
-              onChange={(e) => update("issue", e.target.value)}
+              onChange={(e) => updateField("issue", e.target.value)}
               className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a]"
               placeholder="Tập #1 — Cuộc Chiến Nội Bộ"
             />
@@ -207,7 +197,7 @@ export default function ComicForm() {
             <input
               type="number"
               value={form.price}
-              onChange={(e) => update("price", e.target.value)}
+              onChange={(e) => updateField("price", e.target.value)}
               required
               min="0"
               className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a]"
@@ -221,7 +211,7 @@ export default function ComicForm() {
             <input
               type="number"
               value={form.old_price}
-              onChange={(e) => update("old_price", e.target.value)}
+              onChange={(e) => updateField("old_price", e.target.value)}
               min="0"
               className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a]"
               placeholder="110000"
@@ -234,7 +224,7 @@ export default function ComicForm() {
             <input
               type="number"
               value={form.publish_year}
-              onChange={(e) => update("publish_year", e.target.value)}
+              onChange={(e) => updateField("publish_year", e.target.value)}
               min="1950"
               max="2030"
               className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a]"
@@ -251,7 +241,7 @@ export default function ComicForm() {
             <input
               type="number"
               value={form.stock}
-              onChange={(e) => update("stock", e.target.value)}
+              onChange={(e) => updateField("stock", e.target.value)}
               required
               min="0"
               className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a]"
@@ -263,7 +253,7 @@ export default function ComicForm() {
             </label>
             <select
               value={form.badge}
-              onChange={(e) => update("badge", e.target.value)}
+              onChange={(e) => updateField("badge", e.target.value)}
               className="w-full border border-black/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#e51c2a]"
             >
               <option value="">(Không có badge)</option>
@@ -326,7 +316,7 @@ export default function ComicForm() {
           </label>
           <textarea
             value={form.description}
-            onChange={(e) => update("description", e.target.value)}
+            onChange={(e) => updateField("description", e.target.value)}
             rows={3}
             className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a] resize-none"
             placeholder="Tóm tắt nội dung chính..."
@@ -339,7 +329,7 @@ export default function ComicForm() {
           </label>
           <textarea
             value={form.preview}
-            onChange={(e) => update("preview", e.target.value)}
+            onChange={(e) => updateField("preview", e.target.value)}
             rows={2}
             className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a] resize-none"
             placeholder="Lời thoại hoặc trích đoạn ấn tượng..."
@@ -352,7 +342,7 @@ export default function ComicForm() {
           </label>
           <input
             value={form.image_url}
-            onChange={(e) => update("image_url", e.target.value)}
+            onChange={(e) => updateField("image_url", e.target.value)}
             className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a]"
             placeholder="https://images-na.ssl-images-amazon.com/..."
           />
@@ -368,7 +358,7 @@ export default function ComicForm() {
             </label>
             <input
               value={form.mark}
-              onChange={(e) => update("mark", e.target.value)}
+              onChange={(e) => updateField("mark", e.target.value)}
               className="w-full border border-black/20 px-4 py-3 text-sm outline-none focus:border-[#e51c2a]"
               placeholder="MARVEL, AVENGERS..."
             />
@@ -380,7 +370,7 @@ export default function ComicForm() {
             <input
               type="color"
               value={form.color}
-              onChange={(e) => update("color", e.target.value)}
+              onChange={(e) => updateField("color", e.target.value)}
               className="w-full h-[46px] border border-black/20 p-1 cursor-pointer"
             />
           </div>
@@ -391,7 +381,7 @@ export default function ComicForm() {
             <input
               type="color"
               value={form.accent}
-              onChange={(e) => update("accent", e.target.value)}
+              onChange={(e) => updateField("accent", e.target.value)}
               className="w-full h-[46px] border border-black/20 p-1 cursor-pointer"
             />
           </div>

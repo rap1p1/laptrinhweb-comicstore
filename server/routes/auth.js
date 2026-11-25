@@ -19,8 +19,23 @@ function generateToken(user) {
   );
 }
 
-function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+async function saveOtp(userId, type) {
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  await pool.query(
+    "INSERT INTO otp_codes (user_id, code, type, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '10 minutes')",
+    [userId, code, type]
+  );
+  return code;
+}
+
+async function findValidOtp(userId, code, type) {
+  const result = await pool.query(
+    `SELECT id FROM otp_codes
+     WHERE user_id = $1 AND code = $2 AND type = $3 AND used = FALSE AND expires_at > NOW()
+     ORDER BY created_at DESC LIMIT 1`,
+    [userId, code, type]
+  );
+  return result.rows[0];
 }
 
 // Register
@@ -48,11 +63,7 @@ router.post("/register", async (req, res) => {
     const user = result.rows[0];
 
     // Send verification OTP
-    const otp = generateOTP();
-    await pool.query(
-      "INSERT INTO otp_codes (user_id, code, type, expires_at) VALUES ($1, $2, 'EMAIL_VERIFY', NOW() + INTERVAL '10 minutes')",
-      [user.id, otp]
-    );
+    const otp = await saveOtp(user.id, "EMAIL_VERIFY");
     try {
       await sendOTPEmail(email, otp, "EMAIL_VERIFY");
     } catch (e) {
@@ -155,16 +166,12 @@ router.post("/google", async (req, res) => {
 router.post("/verify-email", authMiddleware, async (req, res) => {
   try {
     const { code } = req.body;
-    const result = await pool.query(
-      "SELECT * FROM otp_codes WHERE user_id = $1 AND code = $2 AND type = 'EMAIL_VERIFY' AND used = FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1",
-      [req.user.id, code]
-    );
-
-    if (result.rows.length === 0) {
+    const otp = await findValidOtp(req.user.id, code, "EMAIL_VERIFY");
+    if (!otp) {
       return res.status(400).json({ error: "Mã OTP không hợp lệ hoặc đã hết hạn" });
     }
 
-    await pool.query("UPDATE otp_codes SET used = TRUE WHERE id = $1", [result.rows[0].id]);
+    await pool.query("UPDATE otp_codes SET used = TRUE WHERE id = $1", [otp.id]);
     await pool.query("UPDATE users SET is_verified = TRUE WHERE id = $1", [req.user.id]);
 
     res.json({ message: "Xác nhận email thành công" });
@@ -186,11 +193,7 @@ router.post("/forgot-password", async (req, res) => {
       return res.status(404).json({ error: "Email này chưa được đăng ký trong hệ thống" });
     }
 
-    const otp = generateOTP();
-    await pool.query(
-      "INSERT INTO otp_codes (user_id, code, type, expires_at) VALUES ($1, $2, 'PASSWORD_RESET', NOW() + INTERVAL '10 minutes')",
-      [result.rows[0].id, otp]
-    );
+    const otp = await saveOtp(result.rows[0].id, "PASSWORD_RESET");
 
     try {
       await sendOTPEmail(email.trim(), otp, "PASSWORD_RESET");
@@ -222,18 +225,15 @@ router.post("/reset-password", async (req, res) => {
       return res.status(400).json({ error: "Mã OTP không hợp lệ" });
     }
 
-    const otpResult = await pool.query(
-      "SELECT * FROM otp_codes WHERE user_id = $1 AND code = $2 AND type = 'PASSWORD_RESET' AND used = FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1",
-      [userResult.rows[0].id, code]
-    );
-
-    if (otpResult.rows.length === 0) {
+    const userId = userResult.rows[0].id;
+    const otp = await findValidOtp(userId, code, "PASSWORD_RESET");
+    if (!otp) {
       return res.status(400).json({ error: "Mã OTP không hợp lệ hoặc đã hết hạn" });
     }
 
     const hash = await bcrypt.hash(newPassword, 10);
-    await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hash, userResult.rows[0].id]);
-    await pool.query("UPDATE otp_codes SET used = TRUE WHERE id = $1", [otpResult.rows[0].id]);
+    await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hash, userId]);
+    await pool.query("UPDATE otp_codes SET used = TRUE WHERE id = $1", [otp.id]);
 
     res.json({ message: "Đặt lại mật khẩu thành công" });
   } catch (err) {
@@ -326,13 +326,9 @@ router.patch("/profile", authMiddleware, async (req, res) => {
 // Resend OTP
 router.post("/resend-otp", authMiddleware, async (req, res) => {
   try {
-    const { type } = req.body;
-    const otp = generateOTP();
-    await pool.query(
-      "INSERT INTO otp_codes (user_id, code, type, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '10 minutes')",
-      [req.user.id, otp, type || "EMAIL_VERIFY"]
-    );
-    await sendOTPEmail(req.user.email, otp, type || "EMAIL_VERIFY");
+    const type = req.body.type || "EMAIL_VERIFY";
+    const otp = await saveOtp(req.user.id, type);
+    await sendOTPEmail(req.user.email, otp, type);
     res.json({ message: "Đã gửi lại mã OTP" });
   } catch (err) {
     console.error("Resend OTP error:", err);

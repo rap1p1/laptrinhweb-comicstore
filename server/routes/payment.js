@@ -3,6 +3,7 @@ import crypto from "crypto";
 import pool from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { sendOrderConfirmation } from "../utils/email.js";
+import { restoreOrderStock } from "../utils/stock.js";
 
 const router = Router();
 
@@ -12,19 +13,18 @@ const VNP_URL = process.env.VNP_URL || "https://sandbox.vnpayment.vn/paymentv2/v
 const CLIENT_URL = process.env.CLIENT_URL || "https://laptrinhweb-comicstore-ltw9.vercel.app";
 const VNP_RETURN_URL = process.env.VNP_RETURN_URL || `${CLIENT_URL}/api/payment/return`;
 
-function sortObject(obj) {
-  const sorted = {};
-  const str = [];
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      str.push(encodeURIComponent(key));
-    }
+// Tạo cùng một chuỗi ký khi gửi yêu cầu và khi kiểm tra kết quả từ VNPay.
+function createSignedQuery(params) {
+  const encodedParams = {};
+  for (const [key, value] of Object.entries(params)) {
+    encodedParams[encodeURIComponent(key)] = encodeURIComponent(value).replace(/%20/g, "+");
   }
-  str.sort();
-  for (let key = 0; key < str.length; key++) {
-    sorted[str[key]] = encodeURIComponent(obj[str[key]]).replace(/%20/g, "+");
-  }
-  return sorted;
+
+  const query = Object.keys(encodedParams).sort()
+    .map((key) => `${key}=${encodedParams[key]}`)
+    .join("&");
+  const signature = crypto.createHmac("sha512", VNP_HASH_SECRET).update(query).digest("hex");
+  return { query, signature };
 }
 
 // Create VNPay payment URL
@@ -69,14 +69,8 @@ router.post("/create", authMiddleware, async (req, res) => {
       vnp_CreateDate: createDate,
     };
 
-    const sortedParams = sortObject(vnpParams);
-    const signData = Object.entries(sortedParams)
-      .map(([key, val]) => `${key}=${val}`)
-      .join("&");
-    const hmac = crypto.createHmac("sha512", VNP_HASH_SECRET);
-    const signed = hmac.update(Buffer.from(signData, "utf-8")).digest("hex");
-
-    const paymentUrl = `${VNP_URL}?${signData}&vnp_SecureHash=${signed}`;
+    const { query, signature } = createSignedQuery(vnpParams);
+    const paymentUrl = `${VNP_URL}?${query}&vnp_SecureHash=${signature}`;
 
     // Save payment ref
     await pool.query("UPDATE orders SET payment_ref = $1 WHERE id = $2", [orderId, order.id]);
@@ -90,69 +84,46 @@ router.post("/create", authMiddleware, async (req, res) => {
 
 // VNPay return callback
 router.get("/return", async (req, res) => {
+  const failureUrl = `${CLIENT_URL}/payment/failed`;
   try {
-    const vnpParams = { ...req.query };
-    const secureHash = vnpParams["vnp_SecureHash"];
-    delete vnpParams["vnp_SecureHash"];
-    delete vnpParams["vnp_SecureHashType"];
+    const { vnp_SecureHash, vnp_SecureHashType, ...paymentParams } = req.query;
+    const { signature } = createSignedQuery(paymentParams);
+    if (vnp_SecureHash !== signature) return res.redirect(failureUrl);
 
-    const sortedParams = sortObject(vnpParams);
-    const signData = Object.entries(sortedParams)
-      .map(([key, val]) => `${key}=${val}`)
-      .join("&");
-    const hmac = crypto.createHmac("sha512", VNP_HASH_SECRET);
-    const checkSum = hmac.update(Buffer.from(signData, "utf-8")).digest("hex");
+    const result = await pool.query(
+      "SELECT * FROM orders WHERE payment_ref = $1",
+      [paymentParams.vnp_TxnRef]
+    );
+    const order = result.rows[0];
+    if (!order) return res.redirect(failureUrl);
 
-    const txnRef = vnpParams["vnp_TxnRef"];
-    const responseCode = vnpParams["vnp_ResponseCode"];
-
-    if (secureHash === checkSum) {
-      // Find order by payment_ref
-      const orderResult = await pool.query(
-        "SELECT * FROM orders WHERE payment_ref = $1",
-        [txnRef]
-      );
-
-      if (orderResult.rows.length > 0) {
-        const order = orderResult.rows[0];
-        if (responseCode === "00") {
-          await pool.query("UPDATE orders SET status = 'CONFIRMED' WHERE id = $1", [order.id]);
-
-          // Send confirmation email
-          try {
-            const userResult = await pool.query("SELECT email FROM users WHERE id = $1", [order.user_id]);
-            const itemsResult = await pool.query(
-              "SELECT oi.*, c.title FROM order_items oi JOIN comics c ON oi.comic_id = c.id WHERE oi.order_id = $1",
-              [order.id]
-            );
-            await sendOrderConfirmation(
-              userResult.rows[0].email,
-              order,
-              itemsResult.rows.map((i) => ({ title: i.title, quantity: i.quantity, price: i.price * i.quantity }))
-            );
-          } catch (e) {
-            console.error("Order email failed:", e.message);
-          }
-
-          res.redirect(`${CLIENT_URL}/payment/success?orderId=${order.id}`);
-        } else {
-          await pool.query("UPDATE orders SET status = 'CANCELLED' WHERE id = $1", [order.id]);
-          // Restore stock
-          const items = await pool.query("SELECT comic_id, quantity FROM order_items WHERE order_id = $1", [order.id]);
-          for (const item of items.rows) {
-            await pool.query("UPDATE comics SET stock = stock + $1 WHERE id = $2", [item.quantity, item.comic_id]);
-          }
-          res.redirect(`${CLIENT_URL}/payment/failed?orderId=${order.id}`);
-        }
-      } else {
-        res.redirect(`${CLIENT_URL}/payment/failed`);
-      }
-    } else {
-      res.redirect(`${CLIENT_URL}/payment/failed`);
+    if (paymentParams.vnp_ResponseCode !== "00") {
+      await pool.query("UPDATE orders SET status = 'CANCELLED' WHERE id = $1", [order.id]);
+      await restoreOrderStock(order.id);
+      return res.redirect(`${failureUrl}?orderId=${order.id}`);
     }
+
+    await pool.query("UPDATE orders SET status = 'CONFIRMED' WHERE id = $1", [order.id]);
+
+    try {
+      const userResult = await pool.query("SELECT email FROM users WHERE id = $1", [order.user_id]);
+      const itemsResult = await pool.query(
+        "SELECT oi.*, c.title FROM order_items oi JOIN comics c ON oi.comic_id = c.id WHERE oi.order_id = $1",
+        [order.id]
+      );
+      await sendOrderConfirmation(
+        userResult.rows[0].email,
+        order,
+        itemsResult.rows.map((item) => ({ title: item.title, quantity: item.quantity, price: item.price * item.quantity }))
+      );
+    } catch (err) {
+      console.error("Order email failed:", err.message);
+    }
+
+    res.redirect(`${CLIENT_URL}/payment/success?orderId=${order.id}`);
   } catch (err) {
     console.error("VNPay return error:", err);
-    res.redirect(`${CLIENT_URL}/payment/failed`);
+    res.redirect(failureUrl);
   }
 });
 

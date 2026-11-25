@@ -1,3 +1,5 @@
+import type { CartItem } from "./cart";
+
 const API_URL = `${import.meta.env.VITE_API_URL || ""}/api`;
 
 function getToken() {
@@ -6,6 +8,10 @@ function getToken() {
 
 function setAuth(token: string, user: any) {
   localStorage.setItem("token", token);
+  saveUser(user);
+}
+
+function saveUser(user: any) {
   localStorage.setItem("user", JSON.stringify(user));
 }
 
@@ -65,7 +71,7 @@ export const api = {
   updateStock: (id: number, stock: number) => request(`/comics/${id}/stock`, "PATCH", { stock }),
 
   // Cart
-  getCart: () => request("/cart"),
+  getCart: (): Promise<CartItem[]> => request("/cart"),
   addToCart: (comic_id: number, quantity?: number) => request("/cart", "POST", { comic_id, quantity: quantity || 1 }),
   updateCartItem: (id: number, quantity: number) => request(`/cart/${id}`, "PUT", { quantity }),
   removeFromCart: (id: number) => request(`/cart/${id}`, "DELETE"),
@@ -97,7 +103,7 @@ export const api = {
 
   // Helpers
   setAuth,
+  saveUser,
   clearAuth,
   getUser,
-  getToken,
 };

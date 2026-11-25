@@ -1,36 +1,28 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { useAuth } from "../App";
+import { formatMoney } from "../formatMoney";
+import OrderStatusBadge from "../components/OrderStatusBadge";
 
-const money = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
+const orderTabs = [
+  { label: "Tất cả", statuses: [] },
+  { label: "Chờ vận chuyển", statuses: ["PENDING", "CONFIRMED"] },
+  { label: "Đang giao", statuses: ["SHIPPING"] },
+  { label: "Đã nhận / giao", statuses: ["DELIVERED"] },
+  { label: "Yêu cầu hoàn đơn", statuses: ["RETURN_REQUESTED"] },
+  { label: "Đã hủy / Từ chối / Hoàn", statuses: ["RETURNED", "REJECTED", "CANCELLED"] },
+];
 
-const statusConfig: Record<string, { text: string; bg: string; textCol: string; border: string }> = {
-  PENDING: { text: "Chờ xác nhận", bg: "bg-amber-50", textCol: "text-amber-800", border: "border-amber-200" },
-  CONFIRMED: { text: "Chờ vận chuyển", bg: "bg-blue-50", textCol: "text-blue-800", border: "border-blue-200" },
-  SHIPPING: { text: "Đang giao hàng", bg: "bg-orange-50", textCol: "text-orange-800", border: "border-orange-200" },
-  DELIVERED: { text: "Đã giao / nhận", bg: "bg-emerald-50", textCol: "text-emerald-800", border: "border-emerald-200" },
-  RETURN_REQUESTED: { text: "Yêu cầu hoàn đơn", bg: "bg-purple-50", textCol: "text-purple-800", border: "border-purple-200" },
-  RETURNED: { text: "Đã hoàn đơn", bg: "bg-neutral-100", textCol: "text-neutral-700", border: "border-neutral-300" },
-  REJECTED: { text: "Từ chối nhận", bg: "bg-rose-50", textCol: "text-rose-800", border: "border-rose-200" },
-  CANCELLED: { text: "Đã hủy", bg: "bg-neutral-100", textCol: "text-neutral-500", border: "border-neutral-200" },
-};
-
-export default function ManageComics() {
-  const { user } = useAuth();
+export default function ManageOrders() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
-  const [filterTab, setFilterTab] = useState<string>("ALL");
+  const [selectedTab, setSelectedTab] = useState(orderTabs[0]);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user || (user.role !== "MANAGER" && user.role !== "SYSTEM_ADMIN")) {
-      navigate("/");
-      return;
-    }
     loadOrders();
-  }, [user]);
+  }, []);
 
   const loadOrders = async () => {
     try {
@@ -55,15 +47,10 @@ export default function ManageComics() {
     }
   };
 
-  const filteredOrders = orders.filter((order) => {
-    if (filterTab === "ALL") return true;
-    if (filterTab === "WAIT_SHIP") return ["PENDING", "CONFIRMED"].includes(order.status);
-    if (filterTab === "SHIPPING") return order.status === "SHIPPING";
-    if (filterTab === "DELIVERED") return order.status === "DELIVERED";
-    if (filterTab === "RETURN_REQUESTED") return order.status === "RETURN_REQUESTED";
-    if (filterTab === "CLOSED") return ["RETURNED", "REJECTED", "CANCELLED"].includes(order.status);
-    return true;
-  });
+  const statuses = selectedTab.statuses;
+  const filteredOrders = statuses.length === 0
+    ? orders
+    : orders.filter((order) => statuses.includes(order.status));
 
   if (loading) {
     return (
@@ -95,19 +82,12 @@ export default function ManageComics() {
 
       {/* Filter Tabs */}
       <div className="flex flex-wrap gap-2 mb-6 border-b border-black/10 pb-4">
-        {[
-          { key: "ALL", label: "Tất cả" },
-          { key: "WAIT_SHIP", label: "Chờ vận chuyển" },
-          { key: "SHIPPING", label: "Đang giao" },
-          { key: "DELIVERED", label: "Đã nhận / giao" },
-          { key: "RETURN_REQUESTED", label: "Yêu cầu hoàn đơn" },
-          { key: "CLOSED", label: "Đã hủy / Từ chối / Hoàn" },
-        ].map((tab) => (
+        {orderTabs.map((tab) => (
           <button
-            key={tab.key}
-            onClick={() => setFilterTab(tab.key)}
+            key={tab.label}
+            onClick={() => setSelectedTab(tab)}
             className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition ${
-              filterTab === tab.key
+              selectedTab === tab
                 ? "bg-black text-white"
                 : "bg-white border border-black/15 text-black/70 hover:border-black"
             }`}
@@ -124,12 +104,6 @@ export default function ManageComics() {
       ) : (
         <div className="space-y-4">
           {filteredOrders.map((order) => {
-            const status = statusConfig[order.status] || {
-              text: order.status,
-              bg: "bg-gray-100",
-              textCol: "text-gray-800",
-              border: "border-gray-200"
-            };
             const isProcessing = updatingId === order.id;
 
             return (
@@ -137,9 +111,7 @@ export default function ManageComics() {
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-black/10">
                   <div className="flex items-center gap-3">
                     <span className="font-display text-lg font-black">Đơn #{order.id}</span>
-                    <span className={`px-3 py-1 text-xs font-bold rounded-full border ${status.bg} ${status.textCol} ${status.border}`}>
-                      {status.text}
-                    </span>
+                    <OrderStatusBadge status={order.status} label={order.status === "DELIVERED" ? "Đã giao / nhận" : undefined} />
                     <span className="text-xs text-black/50">
                       {order.payment_method === "VNPAY" ? "VNPay" : "COD"}
                     </span>
@@ -191,7 +163,7 @@ export default function ManageComics() {
                   {order.items?.map((item: any, i: number) => (
                     <div key={i} className="flex justify-between items-center py-1 border-b border-black/5">
                       <span>{item.title} <strong className="text-black/50">x{item.quantity}</strong></span>
-                      <span className="font-bold">{money.format(item.price * item.quantity)}</span>
+                      <span className="font-bold">{formatMoney(item.price * item.quantity)}</span>
                     </div>
                   ))}
                 </div>
@@ -200,7 +172,7 @@ export default function ManageComics() {
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-black/10">
                   <div className="text-sm">
                     <span className="text-black/50">Tổng thanh toán: </span>
-                    <span className="font-display text-lg font-black text-[#e51c2a]">{money.format(order.total)}</span>
+                    <span className="font-display text-lg font-black text-[#e51c2a]">{formatMoney(order.total)}</span>
                   </div>
 
                   {/* Quick Action Buttons */}

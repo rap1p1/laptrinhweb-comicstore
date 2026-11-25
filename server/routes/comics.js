@@ -4,6 +4,21 @@ import { authMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = Router();
 
+// API chấp nhận tên nhân vật hoặc một đối tượng có tên và link Wiki.
+async function addComicCharacters(comicId, characters) {
+  if (!characters?.length) return;
+
+  for (const character of characters) {
+    const hasDetails = typeof character === "object";
+    const name = hasDetails ? character.name : character;
+    const wikiUrl = hasDetails ? character.wiki_url : null;
+    await pool.query(
+      "INSERT INTO comic_characters (comic_id, character_name, wiki_url) VALUES ($1, $2, $3)",
+      [comicId, name, wikiUrl]
+    );
+  }
+}
+
 // Get all approved comics (public)
 router.get("/", async (req, res) => {
   try {
@@ -124,17 +139,7 @@ router.post("/", authMiddleware, requireRole("PUBLISHER", "SYSTEM_ADMIN"), async
 
     const comic = result.rows[0];
 
-    // Insert characters
-    if (characters && characters.length > 0) {
-      for (const char of characters) {
-        const charName = typeof char === 'object' ? char.name : char;
-        const wikiUrl = typeof char === 'object' ? char.wiki_url : null;
-        await pool.query(
-          "INSERT INTO comic_characters (comic_id, character_name, wiki_url) VALUES ($1, $2, $3)",
-          [comic.id, charName, wikiUrl]
-        );
-      }
-    }
+    await addComicCharacters(comic.id, characters);
 
     res.status(201).json(comic);
   } catch (err) {
@@ -164,16 +169,7 @@ router.put("/:id", authMiddleware, requireRole("PUBLISHER", "SYSTEM_ADMIN"), asy
 
     // Update characters
     await pool.query("DELETE FROM comic_characters WHERE comic_id = $1", [id]);
-    if (characters && characters.length > 0) {
-      for (const char of characters) {
-        const charName = typeof char === 'object' ? char.name : char;
-        const wikiUrl = typeof char === 'object' ? char.wiki_url : null;
-        await pool.query(
-          "INSERT INTO comic_characters (comic_id, character_name, wiki_url) VALUES ($1, $2, $3)",
-          [id, charName, wikiUrl]
-        );
-      }
-    }
+    await addComicCharacters(id, characters);
 
     res.json(result.rows[0]);
   } catch (err) {

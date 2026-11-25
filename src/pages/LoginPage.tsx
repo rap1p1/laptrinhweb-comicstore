@@ -5,6 +5,12 @@ import { useAuth } from "../App";
 
 const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "882954428096-pt2dqpejijgg0l4r1u5u5mdb24pld6n3.apps.googleusercontent.com";
 
+function homeForRole(role: string) {
+  if (role === "SYSTEM_ADMIN" || role === "MANAGER") return "/dashboard";
+  if (role === "PUBLISHER") return "/publisher/comics";
+  return "/";
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -12,18 +18,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
   const navigate = useNavigate();
-  const { user, setUser, login } = useAuth();
+  const { user, login } = useAuth();
 
   useEffect(() => {
-    if (!user) return;
-
-    if (user.role === "SYSTEM_ADMIN" || user.role === "MANAGER") {
-      navigate("/dashboard");
-    } else if (user.role === "PUBLISHER") {
-      navigate("/publisher/comics");
-    } else {
-      navigate("/");
-    }
+    if (user) navigate(homeForRole(user.role));
   }, [user, navigate]);
 
   const signIn = async (loginEmail: string, loginPassword: string) => {
@@ -50,39 +48,36 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    const initGsi = () => {
-      if (!(window as any).google?.accounts?.id) return;
+    async function signInWithGoogle(response: { credential: string }) {
+      setLoading(true);
+      setError("");
       try {
-        (window as any).google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: async (response: any) => {
-            try {
-              setLoading(true);
-              setError("");
-              const data = await api.googleLogin(response.credential);
-              api.setAuth(data.token, data.user);
-              setUser(data.user);
+        const data = await api.googleLogin(response.credential);
+        api.setAuth(data.token, data.user);
 
-              if (data.user?.role === "SYSTEM_ADMIN" || data.user?.role === "MANAGER") {
-                window.location.href = "/dashboard";
-              } else if (data.user?.role === "PUBLISHER") {
-                window.location.href = "/publisher/comics";
-              } else if (data.isNewUser || !data.user?.phone || !data.user?.address) {
-                window.location.href = "/profile?onboarding=true";
-              } else {
-                window.location.href = "/";
-              }
-            } catch (err: any) {
-              setError(err.message || "Đăng nhập Google thất bại");
-              setLoading(false);
-            }
-          },
+        const home = homeForRole(data.user.role);
+        const needsProfile = data.isNewUser || !data.user.phone || !data.user.address;
+        // Tải trang đích để ứng dụng đọc phiên Google vừa được lưu.
+        window.location.href = home === "/" && needsProfile ? "/profile?onboarding=true" : home;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Đăng nhập Google thất bại");
+        setLoading(false);
+      }
+    }
+
+    function initGoogleSignIn() {
+      const googleSignIn = (window as any).google?.accounts?.id;
+      if (!googleSignIn) return;
+      try {
+        googleSignIn.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: signInWithGoogle,
         });
 
         const btnContainer = document.getElementById("googleBtnDiv");
         if (btnContainer) {
           btnContainer.innerHTML = "";
-          (window as any).google.accounts.id.renderButton(btnContainer, {
+          googleSignIn.renderButton(btnContainer, {
             theme: "outline",
             size: "large",
             width: btnContainer.offsetWidth || 340,
@@ -94,21 +89,19 @@ export default function LoginPage() {
       } catch (e) {
         console.warn("Google init error:", e);
       }
-    };
-
-    if (!(window as any).google?.accounts?.id) {
-      const script = document.createElement("script");
-      script.src = "https://accounts.google.com/gsi/client";
-      script.async = true;
-      script.defer = true;
-      script.onload = initGsi;
-      document.body.appendChild(script);
-      return () => {
-        try { document.body.removeChild(script); } catch {}
-      };
-    } else {
-      initGsi();
     }
+
+    if ((window as any).google?.accounts?.id) {
+      initGoogleSignIn();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.onload = initGoogleSignIn;
+    document.body.appendChild(script);
+    return () => script.remove();
   }, []);
 
   const handleManualGoogle = () => {

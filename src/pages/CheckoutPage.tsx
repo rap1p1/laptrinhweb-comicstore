@@ -2,15 +2,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../App";
-
-const money = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
+import { calculateCartTotal, calculateShippingFee, type CartItem } from "../cart";
+import { formatMoney } from "../formatMoney";
 
 export default function CheckoutPage() {
   const { user, refreshCart } = useAuth();
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("COD");
+  const [paymentMethod, setPaymentMethod] = useState<"COD" | "VNPAY">("COD");
   const [name, setName] = useState(user?.name || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [address, setAddress] = useState(user?.address || "");
@@ -18,30 +18,31 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) { navigate("/login"); return; }
-    if (user.role !== "BUYER") {
-      navigate(user.role === "PUBLISHER" ? "/publisher/comics" : "/dashboard");
-      return;
-    }
-    if (user.name && !name) setName(user.name);
-    if (user.phone && !phone) setPhone(user.phone);
-    if (user.address && !address) setAddress(user.address);
+    if (user?.name && !name) setName(user.name);
+    if (user?.phone && !phone) setPhone(user.phone);
+    if (user?.address && !address) setAddress(user.address);
     loadCart();
   }, [user]);
 
   const loadCart = async () => {
     try {
-      const data = await api.getCart();
-      if (data.length === 0) { navigate("/cart"); return; }
-      setItems(data);
-    } catch { navigate("/cart"); }
-    finally { setLoading(false); }
+      const cartItems = await api.getCart();
+      if (cartItems.length === 0) {
+        navigate("/cart");
+        return;
+      }
+      setItems(cartItems);
+    } catch {
+      navigate("/cart");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = total >= 499000 ? 0 : 30000;
+  const total = calculateCartTotal(items);
+  const shipping = calculateShippingFee(total);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const placeOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!name || !phone || !address) {
@@ -58,25 +59,19 @@ export default function CheckoutPage() {
       });
       await refreshCart();
 
-      if (paymentMethod === "VNPAY") {
-        try {
-          const res = await api.createPayment(order.id);
-          if (res?.paymentUrl) {
-            window.location.href = res.paymentUrl;
-            return;
-          }
-          throw new Error("Không nhận được liên kết thanh toán từ cổng VNPay");
-        } catch (vnpErr: any) {
-          console.error("VNPay error:", vnpErr);
-          setError(vnpErr.message || "Không thể kết nối cổng VNPay. Vui lòng thử lại");
-          setSubmitting(false);
-          return;
-        }
-      } else {
+      // COD hoàn tất ngay sau khi tạo đơn. VNPay cần thêm liên kết thanh toán.
+      if (paymentMethod === "COD") {
         navigate(`/payment/success?orderId=${order.id}`);
+        return;
       }
-    } catch (err: any) {
-      setError(err.message);
+
+      const payment = await api.createPayment(order.id);
+      if (!payment?.paymentUrl) {
+        throw new Error("Không nhận được liên kết thanh toán từ cổng VNPay");
+      }
+      window.location.href = payment.paymentUrl;
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "Không thể hoàn tất đặt hàng");
       setSubmitting(false);
     }
   };
@@ -89,7 +84,7 @@ export default function CheckoutPage() {
 
       {error && <div className="mb-5 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 font-medium">{error}</div>}
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={placeOrder}>
         <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
           <div className="space-y-6">
             <div className="border border-black/10 bg-white p-6">
@@ -142,23 +137,23 @@ export default function CheckoutPage() {
             <div className="space-y-3 max-h-64 overflow-y-auto">
               {items.map((item) => (
                 <div key={item.id} className="flex gap-3 text-sm">
-                  <div className="shrink-0 w-12 h-16 overflow-hidden" style={{ backgroundColor: item.color }}>
+                  <div className="shrink-0 w-12 h-16 overflow-hidden" style={{ backgroundColor: item.color ?? undefined }}>
                     {item.image_url ? <img src={item.image_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><span className="font-display text-[8px] font-black text-white/80">{item.mark}</span></div>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold truncate">{item.title}</p>
                     <p className="text-black/50">x{item.quantity}</p>
                   </div>
-                  <p className="font-bold shrink-0">{money.format(item.price * item.quantity)}</p>
+                  <p className="font-bold shrink-0">{formatMoney(item.price * item.quantity)}</p>
                 </div>
               ))}
             </div>
             <div className="border-t border-black/10 mt-4 pt-4 space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-black/60">Tạm tính</span><span>{money.format(total)}</span></div>
-              <div className="flex justify-between"><span className="text-black/60">Vận chuyển</span><span className={shipping === 0 ? "text-green-600" : ""}>{shipping === 0 ? "Miễn phí" : money.format(shipping)}</span></div>
+              <div className="flex justify-between"><span className="text-black/60">Tạm tính</span><span>{formatMoney(total)}</span></div>
+              <div className="flex justify-between"><span className="text-black/60">Vận chuyển</span><span className={shipping === 0 ? "text-green-600" : ""}>{shipping === 0 ? "Miễn phí" : formatMoney(shipping)}</span></div>
               <div className="border-t border-black/10 pt-3 flex justify-between">
                 <span className="font-display text-lg font-black">Tổng</span>
-                <span className="font-display text-2xl font-black text-[#e51c2a]">{money.format(total + shipping)}</span>
+                <span className="font-display text-2xl font-black text-[#e51c2a]">{formatMoney(total + shipping)}</span>
               </div>
             </div>
             <button type="submit" disabled={submitting} className="w-full mt-4 bg-[#e51c2a] py-3.5 text-sm font-black tracking-wider text-white uppercase hover:bg-black transition disabled:opacity-50">

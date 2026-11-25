@@ -1,61 +1,60 @@
 import { Router } from "express";
-import crypto from "crypto";
 import pool from "../db.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { sendOrderConfirmation } from "../utils/email.js";
+import { restoreOrderStock } from "../utils/stock.js";
 
 const router = Router();
+const closedStatuses = ["CANCELLED", "RETURNED", "REJECTED"];
 
-// Create order from cart
+// Tạo đơn từ giỏ hàng.
 router.post("/", authMiddleware, async (req, res) => {
   if (req.user.role !== "BUYER") {
     return res.status(403).json({ error: "Chỉ tài khoản người mua (BUYER) mới có quyền đặt hàng" });
   }
 
+  const { payment_method = "COD", shipping_name, shipping_phone, shipping_address } = req.body ?? {};
+
+  if (!shipping_name || !shipping_phone || !shipping_address) {
+    return res.status(400).json({ error: "Vui lòng điền đầy đủ thông tin giao hàng" });
+  }
+
   const client = await pool.connect();
   try {
+    // Ghi đơn, trừ kho và xóa giỏ trong cùng một giao dịch.
     await client.query("BEGIN");
 
-    const { payment_method = "COD", shipping_name, shipping_phone, shipping_address } = req.body;
-
-    if (!shipping_name || !shipping_phone || !shipping_address) {
-      return res.status(400).json({ error: "Vui lòng điền đầy đủ thông tin giao hàng" });
-    }
-
-    // Get cart items
-    const cartResult = await client.query(
+    const { rows: cartItems } = await client.query(
       `SELECT ci.comic_id, ci.quantity, c.price, c.stock, c.title 
        FROM cart_items ci JOIN comics c ON ci.comic_id = c.id 
        WHERE ci.user_id = $1`,
       [req.user.id]
     );
 
-    if (cartResult.rows.length === 0) {
+    if (cartItems.length === 0) {
       await client.query("ROLLBACK");
       return res.status(400).json({ error: "Giỏ hàng trống" });
     }
 
-    // Check stock
-    for (const item of cartResult.rows) {
+    let total = 0;
+    for (const item of cartItems) {
       if (item.stock < item.quantity) {
         await client.query("ROLLBACK");
         return res.status(400).json({ error: `"${item.title}" không đủ hàng (còn ${item.stock})` });
       }
+      total += item.price * item.quantity;
     }
 
-    const total = cartResult.rows.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-    // Create order
+    const status = payment_method === "VNPAY" ? "PENDING" : "CONFIRMED";
     const orderResult = await client.query(
       `INSERT INTO orders (user_id, total, payment_method, shipping_name, shipping_phone, shipping_address, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [req.user.id, total, payment_method, shipping_name, shipping_phone, shipping_address, payment_method === "VNPAY" ? "PENDING" : "CONFIRMED"]
+      [req.user.id, total, payment_method, shipping_name, shipping_phone, shipping_address, status]
     );
-
     const order = orderResult.rows[0];
 
-    // Create order items and reduce stock
-    for (const item of cartResult.rows) {
+    // Lưu từng truyện trong đơn theo giá tại thời điểm mua.
+    for (const item of cartItems) {
       await client.query(
         "INSERT INTO order_items (order_id, comic_id, quantity, price) VALUES ($1, $2, $3, $4)",
         [order.id, item.comic_id, item.quantity, item.price]
@@ -66,19 +65,18 @@ router.post("/", authMiddleware, async (req, res) => {
       );
     }
 
-    // Clear cart
     await client.query("DELETE FROM cart_items WHERE user_id = $1", [req.user.id]);
 
     await client.query("COMMIT");
 
-    // Send confirmation email for COD orders
+    // Gửi email sau khi đơn COD đã được lưu.
     if (payment_method === "COD") {
       try {
         const userResult = await pool.query("SELECT email FROM users WHERE id = $1", [req.user.id]);
         await sendOrderConfirmation(
           userResult.rows[0].email,
           order,
-          cartResult.rows.map((item) => ({ title: item.title, quantity: item.quantity, price: item.price * item.quantity }))
+          cartItems.map((item) => ({ title: item.title, quantity: item.quantity, price: item.price * item.quantity }))
         );
       } catch (e) {
         console.error("Order email failed:", e.message);
@@ -153,16 +151,11 @@ router.patch("/:id/customer-action", authMiddleware, async (req, res) => {
         return res.status(400).json({ error: "Chỉ có thể hủy đơn khi chưa giao hàng" });
       }
       newStatus = "CANCELLED";
-    } else if (action === "CONFIRM_RECEIVED") {
+    } else if (action === "CONFIRM_RECEIVED" || action === "REJECT_DELIVERY") {
       if (order.status !== "SHIPPING") {
         return res.status(400).json({ error: "Đơn hàng phải ở trạng thái đang giao" });
       }
-      newStatus = "DELIVERED";
-    } else if (action === "REJECT_DELIVERY") {
-      if (order.status !== "SHIPPING") {
-        return res.status(400).json({ error: "Đơn hàng phải ở trạng thái đang giao" });
-      }
-      newStatus = "REJECTED";
+      newStatus = action === "CONFIRM_RECEIVED" ? "DELIVERED" : "REJECTED";
     } else if (action === "REQUEST_RETURN") {
       if (order.status !== "DELIVERED") {
         return res.status(400).json({ error: "Chỉ có thể yêu cầu hoàn sau khi đã nhận hàng" });
@@ -178,11 +171,8 @@ router.patch("/:id/customer-action", authMiddleware, async (req, res) => {
     );
 
     // If cancelled or rejected, restore stock
-    if (["CANCELLED", "REJECTED"].includes(newStatus)) {
-      const items = await pool.query("SELECT comic_id, quantity FROM order_items WHERE order_id = $1", [req.params.id]);
-      for (const item of items.rows) {
-        await pool.query("UPDATE comics SET stock = stock + $1 WHERE id = $2", [item.quantity, item.comic_id]);
-      }
+    if (closedStatuses.includes(newStatus)) {
+      await restoreOrderStock(req.params.id);
     }
 
     res.json(updated.rows[0]);
@@ -205,11 +195,8 @@ router.patch("/:id/status", authMiddleware, requireRole("MANAGER", "SYSTEM_ADMIN
     );
 
     // If cancelled or returned, restore stock
-    if (["CANCELLED", "RETURNED", "REJECTED"].includes(status) && !["CANCELLED", "RETURNED", "REJECTED"].includes(oldOrder.rows[0].status)) {
-      const items = await pool.query("SELECT comic_id, quantity FROM order_items WHERE order_id = $1", [req.params.id]);
-      for (const item of items.rows) {
-        await pool.query("UPDATE comics SET stock = stock + $1 WHERE id = $2", [item.quantity, item.comic_id]);
-      }
+    if (closedStatuses.includes(status) && !closedStatuses.includes(oldOrder.rows[0].status)) {
+      await restoreOrderStock(req.params.id);
     }
 
     res.json(result.rows[0]);

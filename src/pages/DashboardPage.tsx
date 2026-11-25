@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../App";
-
-const money = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
+import { formatMoney } from "../formatMoney";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -18,15 +17,9 @@ export default function DashboardPage() {
   const [tagSubmitting, setTagSubmitting] = useState(false);
   const [tagError, setTagError] = useState("");
 
-  const navigate = useNavigate();
-
   useEffect(() => {
-    if (!user || (user.role !== "MANAGER" && user.role !== "SYSTEM_ADMIN")) {
-      navigate("/");
-      return;
-    }
     loadData();
-  }, [user]);
+  }, []);
 
   const loadData = async () => {
     try {
@@ -145,7 +138,7 @@ export default function DashboardPage() {
               <div className="bg-white border border-black/10 p-6 shadow-xs">
                 <span className="text-xs text-black/50 uppercase tracking-wider font-bold">Tổng doanh thu</span>
                 <p className="font-display text-3xl font-black text-[#e51c2a] mt-2">
-                  {money.format(stats?.totalRevenue || 0)}
+                  {formatMoney(stats?.totalRevenue || 0)}
                 </p>
                 <span className="text-xs text-black/40 mt-1 block">Bao gồm toàn bộ đơn hàng hợp lệ</span>
               </div>
@@ -153,7 +146,7 @@ export default function DashboardPage() {
               <div className="bg-white border border-emerald-200 bg-emerald-50/20 p-6 shadow-xs">
                 <span className="text-xs text-emerald-800 uppercase tracking-wider font-bold">Doanh thu đã nhận</span>
                 <p className="font-display text-3xl font-black text-emerald-700 mt-2">
-                  {money.format(stats?.deliveredRevenue || 0)}
+                  {formatMoney(stats?.deliveredRevenue || 0)}
                 </p>
                 <span className="text-xs text-emerald-600 mt-1 block">Khách hàng đã nhận đơn thành công</span>
               </div>
@@ -161,7 +154,7 @@ export default function DashboardPage() {
               <div className="bg-white border border-orange-200 bg-orange-50/20 p-6 shadow-xs">
                 <span className="text-xs text-orange-800 uppercase tracking-wider font-bold">Doanh thu đang giao</span>
                 <p className="font-display text-3xl font-black text-orange-700 mt-2">
-                  {money.format(stats?.shippingRevenue || 0)}
+                  {formatMoney(stats?.shippingRevenue || 0)}
                 </p>
                 <span className="text-xs text-orange-600 mt-1 block">Kiện hàng đang trên đường vận chuyển</span>
               </div>
@@ -201,7 +194,7 @@ export default function DashboardPage() {
           {/* Quick Nav Actions */}
           <div className="grid md:grid-cols-3 gap-5">
             <Link
-              to="/manage/comics"
+              to="/manage/orders"
               className="group border border-black/10 bg-white p-6 hover:border-[#e51c2a] transition shadow-xs"
             >
               <div className="flex items-center gap-3 mb-2">
@@ -278,7 +271,7 @@ export default function DashboardPage() {
                       <span className="text-xs text-black/50 font-medium">
                         <strong className="text-black font-bold">{comic.total_sold ?? comic.sold ?? 0}</strong> cuốn đã bán
                       </span>
-                      <span className="font-bold text-[#e51c2a]">{money.format(Number(comic.total_revenue ?? comic.revenue ?? 0))}</span>
+                      <span className="font-bold text-[#e51c2a]">{formatMoney(Number(comic.total_revenue ?? comic.revenue ?? 0))}</span>
                     </div>
                   </div>
                 ))}

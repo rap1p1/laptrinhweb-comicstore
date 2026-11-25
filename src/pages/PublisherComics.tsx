@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api } from "../api";
-import { useAuth } from "../App";
+import { formatMoney } from "../formatMoney";
 
-const money = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
 const statusLabels: Record<string, { text: string; color: string }> = {
   DRAFT: { text: "Nháp", color: "bg-gray-100 text-gray-700" },
   PENDING: { text: "Chờ duyệt", color: "bg-yellow-100 text-yellow-800" },
@@ -12,18 +11,12 @@ const statusLabels: Record<string, { text: string; color: string }> = {
 };
 
 export default function PublisherComics() {
-  const { user } = useAuth();
   const [comics, setComics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user || (user.role !== "PUBLISHER" && user.role !== "SYSTEM_ADMIN")) {
-      navigate("/");
-      return;
-    }
     loadComics();
-  }, [user]);
+  }, []);
 
   const loadComics = async () => {
     try {
@@ -84,7 +77,7 @@ export default function PublisherComics() {
                         </div>
                         <p className="text-xs text-black/50">{comic.issue}</p>
                       </div>
-                      <span className="font-display text-lg font-black">{money.format(comic.price)}</span>
+                      <span className="font-display text-lg font-black">{formatMoney(comic.price)}</span>
                     </div>
                     {comic.reject_reason && (
                       <div className="mt-2 bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">

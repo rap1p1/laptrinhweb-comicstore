@@ -1,23 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { useAuth } from "../App";
-
-const money = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
-
-const statusConfig: Record<string, { text: string; bg: string; textCol: string; border: string }> = {
-  PENDING: { text: "Chờ xác nhận", bg: "bg-amber-50", textCol: "text-amber-800", border: "border-amber-200" },
-  CONFIRMED: { text: "Chờ vận chuyển", bg: "bg-blue-50", textCol: "text-blue-800", border: "border-blue-200" },
-  SHIPPING: { text: "Đang giao hàng", bg: "bg-orange-50", textCol: "text-orange-800", border: "border-orange-200" },
-  DELIVERED: { text: "Đã nhận hàng", bg: "bg-emerald-50", textCol: "text-emerald-800", border: "border-emerald-200" },
-  RETURN_REQUESTED: { text: "Yêu cầu hoàn đơn", bg: "bg-purple-50", textCol: "text-purple-800", border: "border-purple-200" },
-  RETURNED: { text: "Đã hoàn đơn", bg: "bg-neutral-100", textCol: "text-neutral-700", border: "border-neutral-300" },
-  REJECTED: { text: "Từ chối nhận", bg: "bg-rose-50", textCol: "text-rose-800", border: "border-rose-200" },
-  CANCELLED: { text: "Đã hủy", bg: "bg-neutral-100", textCol: "text-neutral-500", border: "border-neutral-200" },
-};
+import { formatMoney } from "../formatMoney";
+import OrderStatusBadge from "../components/OrderStatusBadge";
 
 export default function MyOrders() {
-  const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -26,13 +13,8 @@ export default function MyOrders() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) { navigate("/login"); return; }
-    if (user.role !== "BUYER") {
-      navigate(user.role === "PUBLISHER" ? "/publisher/comics" : "/dashboard");
-      return;
-    }
     loadOrders();
-  }, [user]);
+  }, []);
 
   const loadOrders = async () => {
     try {
@@ -99,12 +81,6 @@ export default function MyOrders() {
       ) : (
         <div className="space-y-6">
           {orders.map((order) => {
-            const status = statusConfig[order.status] || {
-              text: order.status,
-              bg: "bg-gray-100",
-              textCol: "text-gray-800",
-              border: "border-gray-200"
-            };
             const isProcessing = actionLoading === order.id;
 
             return (
@@ -113,9 +89,7 @@ export default function MyOrders() {
                 <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-black/10 bg-neutral-50/50">
                   <div className="flex items-center gap-3">
                     <span className="font-display text-lg font-black tracking-tight">Đơn #{order.id}</span>
-                    <span className={`px-3 py-1 text-xs font-bold rounded-full border ${status.bg} ${status.textCol} ${status.border}`}>
-                      {status.text}
-                    </span>
+                    <OrderStatusBadge status={order.status} />
                   </div>
                   <div className="text-xs font-medium text-black/50">
                     Đặt lúc: {new Date(order.created_at).toLocaleDateString("vi-VN", {
@@ -149,7 +123,7 @@ export default function MyOrders() {
                           <p className="font-bold truncate text-black">{item.title}</p>
                           <p className="text-xs text-black/50">Số lượng: x{item.quantity}</p>
                         </div>
-                        <span className="font-bold shrink-0">{money.format(item.price * item.quantity)}</span>
+                        <span className="font-bold shrink-0">{formatMoney(item.price * item.quantity)}</span>
                       </div>
                     ))}
                   </div>
@@ -177,7 +151,7 @@ export default function MyOrders() {
                     </span>
                     <span className="text-xs text-black/30">|</span>
                     <span className="text-xs text-black/50 uppercase tracking-wider font-bold">Tổng tiền:</span>
-                    <span className="font-display text-xl font-black text-[#e51c2a]">{money.format(order.total)}</span>
+                    <span className="font-display text-xl font-black text-[#e51c2a]">{formatMoney(order.total)}</span>
                   </div>
 
                   {/* Actions for Buyer */}

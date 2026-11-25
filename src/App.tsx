@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Routes, Route } from "react-router-dom";
 import { useState, useEffect, createContext, useContext } from "react";
 import { api } from "./api";
 import Layout from "./components/Layout";
@@ -12,7 +12,7 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentFailed from "./pages/PaymentFailed";
 import MyOrders from "./pages/MyOrders";
 import DashboardPage from "./pages/DashboardPage";
-import ManageComics from "./pages/ManageComics";
+import ManageOrders from "./pages/ManageOrders";
 import PendingComics from "./pages/PendingComics";
 import ManageUsers from "./pages/ManageUsers";
 import PublisherComics from "./pages/PublisherComics";
@@ -50,6 +50,21 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const useAuth = () => useContext(AuthContext);
+
+// Ba trang mua hàng dùng chung một bước kiểm tra tài khoản.
+function BuyerPages() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === "BUYER") return <Outlet />;
+  if (user.role === "PUBLISHER") return <Navigate to="/publisher/comics" replace />;
+  return <Navigate to="/dashboard" replace />;
+}
+
+function StaffPages({ roles }: { roles: string[] }) {
+  const { user } = useAuth();
+  if (!user || !roles.includes(user.role)) return <Navigate to="/" replace />;
+  return <Outlet />;
+}
 
 export default function App() {
   const [user, setUser] = useState<User | null>(api.getUser);
@@ -91,20 +106,29 @@ export default function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<HomePage />} />
-            <Route path="/cart" element={<CartPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/my-orders" element={<MyOrders />} />
+            <Route element={<BuyerPages />}>
+              <Route path="/cart" element={<CartPage />} />
+              <Route path="/checkout" element={<CheckoutPage />} />
+              <Route path="/my-orders" element={<MyOrders />} />
+            </Route>
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<ProfilePage />} />
             <Route path="/payment/success" element={<PaymentSuccess />} />
             <Route path="/payment/failed" element={<PaymentFailed />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/manage/comics" element={<ManageComics />} />
-            <Route path="/manage/pending" element={<PendingComics />} />
-            <Route path="/manage/users" element={<ManageUsers />} />
-            <Route path="/publisher/comics" element={<PublisherComics />} />
-            <Route path="/publisher/comics/new" element={<ComicForm />} />
-            <Route path="/publisher/comics/:id/edit" element={<ComicForm />} />
+            <Route element={<StaffPages roles={["SYSTEM_ADMIN", "MANAGER"]} />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/manage/orders" element={<ManageOrders />} />
+              <Route path="/manage/comics" element={<Navigate to="/manage/orders" replace />} />
+              <Route path="/manage/pending" element={<PendingComics />} />
+            </Route>
+            <Route element={<StaffPages roles={["SYSTEM_ADMIN"]} />}>
+              <Route path="/manage/users" element={<ManageUsers />} />
+            </Route>
+            <Route element={<StaffPages roles={["SYSTEM_ADMIN", "PUBLISHER"]} />}>
+              <Route path="/publisher/comics" element={<PublisherComics />} />
+              <Route path="/publisher/comics/new" element={<ComicForm />} />
+              <Route path="/publisher/comics/:id/edit" element={<ComicForm />} />
+            </Route>
           </Route>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />

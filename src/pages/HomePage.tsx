@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../App";
+import { formatMoney } from "../formatMoney";
 
 type CharacterDetail = {
   name: string;
@@ -27,7 +28,6 @@ type Comic = {
   stock: number;
 };
 
-const money = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
 
 function getCharacterWiki(comic: Comic, name: string): string {
   const detail = comic.character_details?.find((d) => d.name === name);
@@ -270,8 +270,8 @@ export default function HomePage() {
 
                 <div className="mt-3 flex items-center justify-between border-t border-black/15 pt-3">
                   <div>
-                    <span className="font-display text-lg font-extrabold">{money.format(comic.price)}</span>
-                    {comic.old_price && <span className="ml-2 text-xs text-black/40 line-through">{money.format(comic.old_price)}</span>}
+                    <span className="font-display text-lg font-extrabold">{formatMoney(comic.price)}</span>
+                    {comic.old_price && <span className="ml-2 text-xs text-black/40 line-through">{formatMoney(comic.old_price)}</span>}
                   </div>
                   <button
                     onClick={() => addToCart(comic.id)}
@@ -352,7 +352,7 @@ export default function HomePage() {
                 </div>
                 <p className="mt-4 text-xs text-black/40">Kho: {selectedComic.stock > 0 ? `Còn ${selectedComic.stock} cuốn` : "Hết hàng"}</p>
                 <div className="mt-6 flex items-center justify-between gap-5 border-t border-black/20 pt-6">
-                  <p className="font-display text-2xl font-black">{money.format(selectedComic.price)}</p>
+                  <p className="font-display text-2xl font-black">{formatMoney(selectedComic.price)}</p>
                   <button
                     onClick={() => { addToCart(selectedComic.id); setSelectedComic(null); }}
                     disabled={selectedComic.stock <= 0}

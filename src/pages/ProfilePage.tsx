@@ -73,7 +73,7 @@ export default function ProfilePage() {
         address: address.trim(),
         avatar: avatar.trim() || undefined,
       });
-      api.setAuth(api.getToken() || "", updated);
+      api.saveUser(updated);
       setUser(updated);
       setSuccessMsg("Cập nhật thông tin thành công!");
       if (isOnboarding) {
@@ -110,7 +110,7 @@ export default function ProfilePage() {
     try {
       await api.verifyEmail(verifyOtp.trim());
       const freshUser = await api.me();
-      api.setAuth(api.getToken() || "", freshUser);
+      api.saveUser(freshUser);
       setUser(freshUser);
       setVerifySuccess("Xác thực email thành công!");
       setTimeout(() => {

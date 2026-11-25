@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { useAuth } from "../App";
+import { formatMoney } from "../formatMoney";
 
 export default function PendingComics() {
-  const { user } = useAuth();
   const [comics, setComics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [rejectId, setRejectId] = useState<number | null>(null);
@@ -12,12 +11,8 @@ export default function PendingComics() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user || (user.role !== "MANAGER" && user.role !== "SYSTEM_ADMIN")) {
-      navigate("/");
-      return;
-    }
     loadComics();
-  }, [user]);
+  }, []);
 
   const loadComics = async () => {
     try {
@@ -72,7 +67,7 @@ export default function PendingComics() {
                       <p className="text-xs text-black/50">{comic.issue}</p>
                       <p className="text-xs text-black/40 mt-1">Đăng bởi: <span className="font-bold text-black/60">{comic.creator_name}</span></p>
                     </div>
-                    <span className="font-display text-lg font-black text-[#e51c2a]">{new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(comic.price)}</span>
+                    <span className="font-display text-lg font-black text-[#e51c2a]">{formatMoney(comic.price)}</span>
                   </div>
                   <p className="text-sm text-black/60 mt-2 line-clamp-2">{comic.description}</p>
                   <div className="flex flex-wrap gap-2 mt-2">

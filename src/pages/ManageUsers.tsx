@@ -17,6 +17,16 @@ const roleBadgeColors: Record<string, string> = {
   BUYER: "bg-neutral-100 text-neutral-700 border-neutral-200",
 };
 
+const roleOptions = ["BUYER", "PUBLISHER", "MANAGER", "SYSTEM_ADMIN"];
+const emptyUser = {
+  email: "",
+  name: "",
+  password: "",
+  role: "BUYER",
+  phone: "",
+  address: "",
+};
+
 export default function ManageUsers() {
   const { user } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
@@ -26,14 +36,7 @@ export default function ManageUsers() {
 
   // Create form modal state
   const [showCreate, setShowCreate] = useState(false);
-  const [newUser, setNewUser] = useState({
-    email: "",
-    name: "",
-    password: "",
-    role: "BUYER",
-    phone: "",
-    address: "",
-  });
+  const [newUser, setNewUser] = useState(emptyUser);
   const [createError, setCreateError] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -55,12 +58,8 @@ export default function ManageUsers() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user || user.role !== "SYSTEM_ADMIN") {
-      navigate("/");
-      return;
-    }
     loadUsers();
-  }, [user]);
+  }, []);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setNotification({ type, message });
@@ -128,7 +127,7 @@ export default function ManageUsers() {
       await api.createUser(newUser);
       showToast(`Đã tạo tài khoản "${newUser.name}" thành công!`);
       setShowCreate(false);
-      setNewUser({ email: "", name: "", password: "", role: "BUYER", phone: "", address: "" });
+      setNewUser(emptyUser);
       loadUsers();
     } catch (err: any) {
       setCreateError(err.message || "Tạo tài khoản thất bại");
@@ -399,10 +398,9 @@ export default function ManageUsers() {
                     onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
                     className="w-full border border-black/20 px-3 py-2 text-sm outline-none focus:border-[#e51c2a] disabled:opacity-50"
                   >
-                    <option value="BUYER">Người mua (BUYER)</option>
-                    <option value="PUBLISHER">Nhà xuất bản (PUBLISHER)</option>
-                    <option value="MANAGER">Quản lý (MANAGER)</option>
-                    <option value="SYSTEM_ADMIN">Quản trị viên (SYSTEM_ADMIN)</option>
+                    {roleOptions.map((role) => (
+                      <option key={role} value={role}>{roleLabels[role]} ({role})</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -540,10 +538,9 @@ export default function ManageUsers() {
                     onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
                     className="w-full border border-black/20 px-3 py-2 text-sm outline-none focus:border-[#e51c2a]"
                   >
-                    <option value="BUYER">Người mua (BUYER)</option>
-                    <option value="PUBLISHER">Nhà xuất bản (PUBLISHER)</option>
-                    <option value="MANAGER">Quản lý (MANAGER)</option>
-                    <option value="SYSTEM_ADMIN">Quản trị viên (SYSTEM_ADMIN)</option>
+                    {roleOptions.map((role) => (
+                      <option key={role} value={role}>{roleLabels[role]} ({role})</option>
+                    ))}
                   </select>
                 </div>
               </div>

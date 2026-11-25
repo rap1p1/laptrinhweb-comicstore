@@ -58,7 +58,7 @@
 ## Cài đặt & Chạy
 
 ### Yêu cầu
-- Node.js >= 18
+- Node.js 22.12 trở lên
 - PostgreSQL >= 14
 
 ### 1. Clone repository
@@ -157,12 +157,31 @@ laptrinhweb-comicstore/
 │   ├── db.js               # Database connection
 │   ├── schema.js           # Database schema
 │   ├── seed.js             # Sample data
-│   └── server.js           # Server entry
+│   ├── app.js              # Các API dùng chung ở local và Vercel
+│   └── server.js           # Khởi tạo cơ sở dữ liệu và chạy server local
 ├── index.html
 ├── vite.config.ts
 ├── package.json
 └── README.md
 ```
+
+## Cách đọc và giải thích code
+
+Frontend là phần người dùng nhìn thấy. Khi người dùng bấm nút hoặc mở một trang, frontend gọi API để yêu cầu backend đọc hoặc lưu dữ liệu trong PostgreSQL.
+
+| Khi người dùng… | Bắt đầu đọc ở đâu | Hàm làm gì |
+|---|---|---|
+| Đăng nhập bằng mật khẩu | [LoginPage.tsx](src/pages/LoginPage.tsx) và [App.tsx](src/App.tsx) | `signIn` gửi email và mật khẩu. `login` lưu thông tin phiên nếu đăng nhập thành công. |
+| Xác nhận email hoặc quên mật khẩu | [auth.js](server/routes/auth.js) | `saveOtp` tạo và lưu mã trong 10 phút. `findValidOtp` tìm mã còn hạn, đúng mục đích và chưa được sử dụng. |
+| Mở giỏ hàng | [App.tsx](src/App.tsx), [CartPage.tsx](src/pages/CartPage.tsx) và [cart.ts](src/cart.ts) | `BuyerPages` kiểm tra tài khoản. `loadCart` lấy các truyện trong giỏ. `calculateCartTotal` nhân giá với số lượng rồi cộng từng dòng. |
+| Đặt hàng | [CheckoutPage.tsx](src/pages/CheckoutPage.tsx) và [orders.js](server/routes/orders.js) | `placeOrder` gửi thông tin giao hàng. Backend kiểm tra kho, lưu đơn, trừ kho và xóa giỏ. Các thay đổi đó được lưu cùng nhau trong một giao dịch. Với VNPay, trang lấy thêm liên kết thanh toán. |
+| Thêm hoặc sửa truyện | [ComicForm.tsx](src/pages/ComicForm.tsx) | `updateField` cập nhật ô đang nhập. `saveComic` chuyển các trường như giá và số lượng sang số, rồi gọi API thêm hoặc sửa truyện. |
+| Lọc đơn hàng trong trang quản lý | [ManageOrders.tsx](src/pages/ManageOrders.tsx) | `loadOrders` lấy danh sách. Mỗi tab khai báo các trạng thái cần hiển thị. |
+| Trả kho khi hủy hoặc hoàn đơn | [stock.js](server/utils/stock.js) | `restoreOrderStock` đọc từng dòng của đơn rồi cộng lại số lượng truyện vào kho. |
+
+`request` trong [api.ts](src/api.ts) là chỗ chung để gửi yêu cầu tới backend. Ví dụ, `api.getCart()` gọi `GET /api/cart`, rồi [cart.js](server/routes/cart.js) đọc giỏ của người đang đăng nhập và trả danh sách về giao diện.
+
+[Vite](vite.config.ts) chạy React, Tailwind và chuyển tiếp yêu cầu `/api` tới Express khi chạy local. Trên Vercel, [api/index.js](api/index.js) dùng lại các API trong [server/app.js](server/app.js). Cơ sở dữ liệu cần được khởi tạo trước khi triển khai.
 
 ## API Endpoints
 

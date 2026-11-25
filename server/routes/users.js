@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = Router();
+const roles = ["SYSTEM_ADMIN", "MANAGER", "PUBLISHER", "BUYER"];
 
 // Get all users (ADMIN only)
 router.get("/", authMiddleware, requireRole("SYSTEM_ADMIN"), async (req, res) => {
@@ -27,7 +28,7 @@ router.put("/:id", authMiddleware, requireRole("SYSTEM_ADMIN"), async (req, res)
       return res.status(400).json({ error: "Họ tên và email không được để trống" });
     }
 
-    if (role && !["SYSTEM_ADMIN", "MANAGER", "PUBLISHER", "BUYER"].includes(role)) {
+    if (role && !roles.includes(role)) {
       return res.status(400).json({ error: "Vai trò không hợp lệ" });
     }
 
@@ -47,28 +48,16 @@ router.put("/:id", authMiddleware, requireRole("SYSTEM_ADMIN"), async (req, res)
       passwordHash = await bcrypt.hash(password.trim(), 10);
     }
 
-    let query = "";
-    let params = [];
-
-    if (passwordHash) {
-      query = `
-        UPDATE users 
-        SET name = $1, email = $2, phone = $3, address = $4, role = $5, is_verified = $6, password_hash = $7
-        WHERE id = $8
-        RETURNING id, email, name, role, phone, address, avatar, is_verified, (password_hash IS NOT NULL) as has_password, created_at
-      `;
-      params = [name.trim(), email.trim(), phone || null, address || null, role, is_verified !== undefined ? is_verified : true, passwordHash, userId];
-    } else {
-      query = `
-        UPDATE users 
-        SET name = $1, email = $2, phone = $3, address = $4, role = $5, is_verified = $6
-        WHERE id = $7
-        RETURNING id, email, name, role, phone, address, avatar, is_verified, (password_hash IS NOT NULL) as has_password, created_at
-      `;
-      params = [name.trim(), email.trim(), phone || null, address || null, role, is_verified !== undefined ? is_verified : true, userId];
-    }
-
-    const result = await pool.query(query, params);
+    // COALESCE giữ nguyên mật khẩu nếu lần sửa này không gửi mật khẩu mới.
+    const result = await pool.query(
+      `UPDATE users
+       SET name = $1, email = $2, phone = $3, address = $4, role = $5,
+           is_verified = $6, password_hash = COALESCE($7, password_hash)
+       WHERE id = $8
+       RETURNING id, email, name, role, phone, address, avatar, is_verified,
+                 (password_hash IS NOT NULL) as has_password, created_at`,
+      [name.trim(), email.trim(), phone || null, address || null, role, is_verified === undefined ? true : is_verified, passwordHash, userId]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Không tìm thấy người dùng" });
     }
@@ -84,7 +73,7 @@ router.put("/:id", authMiddleware, requireRole("SYSTEM_ADMIN"), async (req, res)
 router.patch("/:id/role", authMiddleware, requireRole("SYSTEM_ADMIN"), async (req, res) => {
   try {
     const { role } = req.body;
-    if (!["SYSTEM_ADMIN", "MANAGER", "PUBLISHER", "BUYER"].includes(role)) {
+    if (!roles.includes(role)) {
       return res.status(400).json({ error: "Vai trò không hợp lệ" });
     }
 

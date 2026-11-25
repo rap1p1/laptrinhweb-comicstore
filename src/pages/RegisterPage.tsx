@@ -55,7 +55,7 @@ export default function RegisterPage() {
       await api.verifyEmail(otpCode.trim());
       // Refresh user info
       const freshUser = await api.me();
-      api.setAuth(api.getToken() || "", freshUser);
+      api.saveUser(freshUser);
       setUser(freshUser);
       navigate("/profile?verified=true");
     } catch (err: any) {
