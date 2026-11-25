@@ -164,12 +164,13 @@ export default function ProfilePage() {
     );
   }
 
-  const roleText: Record<string, string> = {
+  const roleLabels: Record<string, string> = {
     SYSTEM_ADMIN: "Quản trị viên",
     MANAGER: "Quản lý cửa hàng",
     PUBLISHER: "Nhà xuất bản",
     BUYER: "Khách mua hàng",
   };
+  const roleLabel = user ? roleLabels[user.role] || user.role : "";
 
   return (
     <div className="mx-auto max-w-4xl px-5 py-12 lg:px-12">
@@ -196,7 +197,7 @@ export default function ProfilePage() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold px-3 py-1 bg-black text-white rounded-full">
-            {roleText[user?.role] || user?.role}
+            {roleLabel}
           </span>
           {user?.google_id && (
             <span className="text-xs font-bold px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full flex items-center gap-1">
@@ -347,7 +348,7 @@ export default function ProfilePage() {
             </div>
             <div className="pt-2 text-xs text-black/60 flex justify-between">
               <span>Vai trò:</span>
-              <strong className="text-black">{roleText[user?.role] || user?.role}</strong>
+              <strong className="text-black">{roleLabel}</strong>
             </div>
           </div>
 

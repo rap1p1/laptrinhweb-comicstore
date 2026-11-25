@@ -10,67 +10,44 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
   const navigate = useNavigate();
-  const { user, setUser } = useAuth();
+  const { user, setUser, login } = useAuth();
 
   useEffect(() => {
-    if (user) {
-      if (user.role === "SYSTEM_ADMIN" || user.role === "MANAGER") {
-        navigate("/dashboard");
-      } else if (user.role === "PUBLISHER") {
-        navigate("/publisher/comics");
-      } else {
-        navigate("/");
-      }
-    }
-  }, [user]);
+    if (!user) return;
 
-  const handleQuickLogin = async (demoEmail: string, demoPass: string) => {
+    if (user.role === "SYSTEM_ADMIN" || user.role === "MANAGER") {
+      navigate("/dashboard");
+    } else if (user.role === "PUBLISHER") {
+      navigate("/publisher/comics");
+    } else {
+      navigate("/");
+    }
+  }, [user, navigate]);
+
+  const signIn = async (loginEmail: string, loginPassword: string) => {
+    setError("");
+    setLoading(true);
+    try {
+      await login(loginEmail, loginPassword);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickLogin = (demoEmail: string, demoPass: string) => {
     setEmail(demoEmail);
     setPassword(demoPass);
-    setError("");
-    setLoading(true);
-    try {
-      const data = await api.login(demoEmail, demoPass);
-      api.setAuth(data.token, data.user);
-      setUser(data.user);
-      if (data.user.role === "SYSTEM_ADMIN" || data.user.role === "MANAGER") {
-        navigate("/dashboard");
-      } else if (data.user.role === "PUBLISHER") {
-        navigate("/publisher/comics");
-      } else {
-        navigate("/");
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    return signIn(demoEmail, demoPass);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const data = await api.login(email, password);
-      api.setAuth(data.token, data.user);
-      setUser(data.user);
-      if (data.user.role === "SYSTEM_ADMIN" || data.user.role === "MANAGER") {
-        navigate("/dashboard");
-      } else if (data.user.role === "PUBLISHER") {
-        navigate("/publisher/comics");
-      } else {
-        navigate("/");
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    return signIn(email, password);
   };
-
-  const [googleReady, setGoogleReady] = useState(false);
 
   useEffect(() => {
     const initGsi = () => {

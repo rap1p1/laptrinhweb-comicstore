@@ -15,27 +15,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-const clientUrls = (process.env.CLIENT_URL || "http://localhost:5173")
-  .split(",")
-  .map((u) => u.trim());
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (
-        clientUrls.includes("*") ||
-        clientUrls.includes(origin) ||
-        origin.endsWith(".vercel.app") ||
-        origin.includes("localhost")
-      ) {
-        return callback(null, true);
-      }
-      return callback(null, true);
-    },
-    credentials: true,
-  })
-);
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 // Routes

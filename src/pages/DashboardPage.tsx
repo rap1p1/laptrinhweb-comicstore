@@ -15,7 +15,6 @@ export default function DashboardPage() {
   // New tag form state
   const [newTagName, setNewTagName] = useState("");
   const [newTagWiki, setNewTagWiki] = useState("");
-  const [newTagAvatar, setNewTagAvatar] = useState("");
   const [tagSubmitting, setTagSubmitting] = useState(false);
   const [tagError, setTagError] = useState("");
 
@@ -50,14 +49,9 @@ export default function DashboardPage() {
     setTagSubmitting(true);
     setTagError("");
     try {
-      await api.createTag({
-        name: newTagName.trim(),
-        wiki_link: newTagWiki.trim() || undefined,
-        avatar_url: newTagAvatar.trim() || undefined,
-      });
+      await api.createTag(newTagName.trim(), newTagWiki.trim());
       setNewTagName("");
       setNewTagWiki("");
-      setNewTagAvatar("");
       const updatedTags = await api.getTags();
       setTags(updatedTags);
     } catch (err: any) {
@@ -309,13 +303,9 @@ export default function DashboardPage() {
               {tags.map((tag) => (
                 <div key={tag.id} className="py-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    {tag.avatar_url ? (
-                      <img src={tag.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover border border-black/10" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center font-bold text-xs text-black/60">
-                        {tag.name.charAt(0)}
-                      </div>
-                    )}
+                    <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center font-bold text-xs text-black/60">
+                      {tag.name.charAt(0)}
+                    </div>
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-sm text-black">{tag.name}</span>
@@ -329,9 +319,9 @@ export default function DashboardPage() {
                           {tag.status === "APPROVED" ? "Đã duyệt" : "Chờ duyệt"}
                         </span>
                       </div>
-                      {tag.wiki_link ? (
+                      {tag.wiki_url ? (
                         <a
-                          href={tag.wiki_link}
+                          href={tag.wiki_url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-[#e51c2a] hover:underline flex items-center gap-1 mt-0.5"
@@ -397,19 +387,6 @@ export default function DashboardPage() {
                   placeholder="https://marvel.fandom.com/wiki/..."
                   value={newTagWiki}
                   onChange={(e) => setNewTagWiki(e.target.value)}
-                  className="w-full border border-black/20 px-3 py-2 text-sm outline-none focus:border-[#e51c2a]"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-black/60 block mb-1.5">
-                  Ảnh đại diện (URL)
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/..."
-                  value={newTagAvatar}
-                  onChange={(e) => setNewTagAvatar(e.target.value)}
                   className="w-full border border-black/20 px-3 py-2 text-sm outline-none focus:border-[#e51c2a]"
                 />
               </div>

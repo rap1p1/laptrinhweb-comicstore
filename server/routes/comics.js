@@ -1,16 +1,38 @@
 import { Router } from "express";
 import pool from "../db.js";
-import { authMiddleware, requireRole, optionalAuth } from "../middleware/auth.js";
+import { authMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = Router();
 
 // Get all approved comics (public)
-router.get("/", optionalAuth, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const { search, character, year, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
-    let query = `
-      SELECT c.*, 
+    const filters = ["c.status = 'APPROVED'"];
+    const params = [];
+
+    if (search) {
+      params.push(`%${search}%`);
+      filters.push(`(c.title ILIKE $${params.length} OR c.description ILIKE $${params.length})`);
+    }
+
+    if (character && character !== "Tất cả") {
+      params.push(character);
+      filters.push(`EXISTS (
+        SELECT 1 FROM comic_characters
+        WHERE comic_id = c.id AND character_name = $${params.length}
+      )`);
+    }
+
+    if (year && year !== "Tất cả") {
+      params.push(parseInt(year));
+      filters.push(`c.publish_year = $${params.length}`);
+    }
+
+    const where = filters.join(" AND ");
+    const result = await pool.query(
+      `SELECT c.*,
         COALESCE(json_agg(DISTINCT cc.character_name) FILTER (WHERE cc.character_name IS NOT NULL), '[]') as characters,
         COALESCE(
           json_agg(
@@ -23,58 +45,28 @@ router.get("/", optionalAuth, async (req, res) => {
         ) as character_details
       FROM comics c
       LEFT JOIN comic_characters cc ON c.id = cc.comic_id
-      WHERE c.status = 'APPROVED'
-    `;
-    const params = [];
-    let paramIndex = 1;
-
-    let countQuery = "SELECT COUNT(DISTINCT c.id) FROM comics c LEFT JOIN comic_characters cc ON c.id = cc.comic_id WHERE c.status = 'APPROVED'";
-    const countParams = [];
-    let cParamIndex = 1;
-
-    if (search) {
-      query += ` AND (c.title ILIKE $${paramIndex} OR c.description ILIKE $${paramIndex})`;
-      params.push(`%${search}%`);
-      paramIndex++;
-      countQuery += ` AND (c.title ILIKE $${cParamIndex} OR c.description ILIKE $${cParamIndex})`;
-      countParams.push(`%${search}%`);
-      cParamIndex++;
-    }
-
-    if (character && character !== "Tất cả") {
-      query += ` AND EXISTS (SELECT 1 FROM comic_characters cc2 WHERE cc2.comic_id = c.id AND cc2.character_name = $${paramIndex})`;
-      params.push(character);
-      paramIndex++;
-      countQuery += ` AND EXISTS (SELECT 1 FROM comic_characters cc2 WHERE cc2.comic_id = c.id AND cc2.character_name = $${cParamIndex})`;
-      countParams.push(character);
-      cParamIndex++;
-    }
-
-    if (year && year !== "Tất cả") {
-      query += ` AND c.publish_year = $${paramIndex}`;
-      params.push(parseInt(year));
-      paramIndex++;
-      countQuery += ` AND c.publish_year = $${cParamIndex}`;
-      countParams.push(parseInt(year));
-      cParamIndex++;
-    }
-
-    query += ` GROUP BY c.id ORDER BY c.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    params.push(parseInt(limit), parseInt(offset));
-
-    const result = await pool.query(query, params);
-    const countResult = await pool.query(countQuery, countParams);
+      WHERE ${where}
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, parseInt(limit), parseInt(offset)]
+    );
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM comics c WHERE ${where}`,
+      params
+    );
 
     const yearsResult = await pool.query(
       "SELECT DISTINCT publish_year FROM comics WHERE status = 'APPROVED' AND publish_year IS NOT NULL ORDER BY publish_year DESC"
     );
     const availableYears = yearsResult.rows.map((r) => r.publish_year);
 
+    const total = parseInt(countResult.rows[0].count);
     res.json({
       comics: result.rows,
-      total: parseInt(countResult.rows[0].count),
+      total,
       page: parseInt(page),
-      totalPages: Math.ceil(countResult.rows[0].count / limit),
+      totalPages: Math.ceil(total / limit),
       years: availableYears,
     });
   } catch (err) {

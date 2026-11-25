@@ -35,16 +35,16 @@ type AuthContextType = {
   user: User | null;
   setUser: (u: User | null) => void;
   cartCount: number;
-  refreshCart: () => void;
+  refreshCart: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 };
 
-export const AuthContext = createContext<AuthContextType>({
+const AuthContext = createContext<AuthContextType>({
   user: null,
   setUser: () => {},
   cartCount: 0,
-  refreshCart: () => {},
+  refreshCart: async () => {},
   login: async () => {},
   logout: () => {},
 });
@@ -52,18 +52,19 @@ export const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(api.getUser());
+  const [user, setUser] = useState<User | null>(api.getUser);
   const [cartCount, setCartCount] = useState(0);
 
   const refreshCart = async () => {
-    if (user) {
-      try {
-        const data = await api.getCartCount();
-        setCartCount(data.count);
-      } catch {
-        setCartCount(0);
-      }
-    } else {
+    if (!user) {
+      setCartCount(0);
+      return;
+    }
+
+    try {
+      const data = await api.getCartCount();
+      setCartCount(data.count);
+    } catch {
       setCartCount(0);
     }
   };

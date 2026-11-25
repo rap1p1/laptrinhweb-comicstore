@@ -1,5 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || "";
-const API_URL = `${API_BASE}/api`;
+const API_URL = `${import.meta.env.VITE_API_URL || ""}/api`;
 
 function getToken() {
   return localStorage.getItem("token");
@@ -20,15 +19,18 @@ function getUser() {
   return user ? JSON.parse(user) : null;
 }
 
-async function request(path: string, options: RequestInit = {}) {
+async function request(path: string, method = "GET", body?: object) {
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers,
+    body: JSON.stringify(body),
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Lỗi server");
   return data;
@@ -36,17 +38,17 @@ async function request(path: string, options: RequestInit = {}) {
 
 export const api = {
   // Auth
-  login: (email: string, password: string) => request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
-  register: (email: string, name: string, password: string) => request("/auth/register", { method: "POST", body: JSON.stringify({ email, name, password }) }),
-  googleLogin: (credential: string) => request("/auth/google", { method: "POST", body: JSON.stringify({ credential }) }),
+  login: (email: string, password: string) => request("/auth/login", "POST", { email, password }),
+  register: (email: string, name: string, password: string) => request("/auth/register", "POST", { email, name, password }),
+  googleLogin: (credential: string) => request("/auth/google", "POST", { credential }),
   me: () => request("/auth/me"),
   updateProfile: (data: { name: string; phone?: string; address?: string; avatar?: string }) =>
-    request("/auth/profile", { method: "PATCH", body: JSON.stringify(data) }),
-  verifyEmail: (code: string) => request("/auth/verify-email", { method: "POST", body: JSON.stringify({ code }) }),
-  forgotPassword: (email: string) => request("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
-  resetPassword: (email: string, code: string, newPassword: string) => request("/auth/reset-password", { method: "POST", body: JSON.stringify({ email, code, newPassword }) }),
-  changePassword: (currentPassword: string, newPassword: string) => request("/auth/change-password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) }),
-  resendOtp: (type: string) => request("/auth/resend-otp", { method: "POST", body: JSON.stringify({ type }) }),
+    request("/auth/profile", "PATCH", data),
+  verifyEmail: (code: string) => request("/auth/verify-email", "POST", { code }),
+  forgotPassword: (email: string) => request("/auth/forgot-password", "POST", { email }),
+  resetPassword: (email: string, code: string, newPassword: string) => request("/auth/reset-password", "POST", { email, code, newPassword }),
+  changePassword: (currentPassword: string, newPassword: string) => request("/auth/change-password", "POST", { currentPassword, newPassword }),
+  resendOtp: (type: string) => request("/auth/resend-otp", "POST", { type }),
 
   // Comics
   getComics: (params?: Record<string, string>) => {
@@ -54,46 +56,43 @@ export const api = {
     return request(`/comics${query}`);
   },
   getComic: (id: number) => request(`/comics/${id}`),
-  createComic: (data: any) => request("/comics", { method: "POST", body: JSON.stringify(data) }),
-  updateComic: (id: number, data: any) => request(`/comics/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  deleteComic: (id: number) => request(`/comics/${id}`, { method: "DELETE" }),
+  createComic: (data: any) => request("/comics", "POST", data),
+  updateComic: (id: number, data: any) => request(`/comics/${id}`, "PUT", data),
+  deleteComic: (id: number) => request(`/comics/${id}`, "DELETE"),
   getPendingComics: () => request("/comics/manage/pending"),
   getMyComics: () => request("/comics/manage/my-comics"),
-  getAllComics: () => request("/comics/manage/all"),
-  reviewComic: (id: number, status: string, reject_reason?: string) => request(`/comics/${id}/review`, { method: "PATCH", body: JSON.stringify({ status, reject_reason }) }),
-  updateStock: (id: number, stock: number) => request(`/comics/${id}/stock`, { method: "PATCH", body: JSON.stringify({ stock }) }),
+  reviewComic: (id: number, status: string, reject_reason?: string) => request(`/comics/${id}/review`, "PATCH", { status, reject_reason }),
+  updateStock: (id: number, stock: number) => request(`/comics/${id}/stock`, "PATCH", { stock }),
 
   // Cart
   getCart: () => request("/cart"),
-  addToCart: (comic_id: number, quantity?: number) => request("/cart", { method: "POST", body: JSON.stringify({ comic_id, quantity: quantity || 1 }) }),
-  updateCartItem: (id: number, quantity: number) => request(`/cart/${id}`, { method: "PUT", body: JSON.stringify({ quantity }) }),
-  removeFromCart: (id: number) => request(`/cart/${id}`, { method: "DELETE" }),
-  clearCart: () => request("/cart", { method: "DELETE" }),
+  addToCart: (comic_id: number, quantity?: number) => request("/cart", "POST", { comic_id, quantity: quantity || 1 }),
+  updateCartItem: (id: number, quantity: number) => request(`/cart/${id}`, "PUT", { quantity }),
+  removeFromCart: (id: number) => request(`/cart/${id}`, "DELETE"),
   getCartCount: () => request("/cart/count"),
 
   // Orders
-  createOrder: (data: any) => request("/orders", { method: "POST", body: JSON.stringify(data) }),
+  createOrder: (data: any) => request("/orders", "POST", data),
   getMyOrders: () => request("/orders/my-orders"),
   getAllOrders: () => request("/orders/all"),
-  updateOrderStatus: (id: number, status: string) => request(`/orders/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  updateOrderStatus: (id: number, status: string) => request(`/orders/${id}/status`, "PATCH", { status }),
   customerOrderAction: (id: number, action: string, return_reason?: string) =>
-    request(`/orders/${id}/customer-action`, { method: "PATCH", body: JSON.stringify({ action, return_reason }) }),
+    request(`/orders/${id}/customer-action`, "PATCH", { action, return_reason }),
 
   // Character Tags
   getTags: (all?: boolean) => request(`/tags${all ? "?all=true" : ""}`),
-  createTag: (name: string, wiki_url?: string) => request("/tags", { method: "POST", body: JSON.stringify({ name, wiki_url }) }),
-  reviewTag: (id: number, status: string) => request(`/tags/${id}/review`, { method: "PATCH", body: JSON.stringify({ status }) }),
-  deleteTag: (id: number) => request(`/tags/${id}`, { method: "DELETE" }),
+  createTag: (name: string, wiki_url?: string) => request("/tags", "POST", { name, wiki_url }),
+  reviewTag: (id: number, status: string) => request(`/tags/${id}/review`, "PATCH", { status }),
+  deleteTag: (id: number) => request(`/tags/${id}`, "DELETE"),
 
   // Payment
-  createPayment: (order_id: number) => request("/payment/create", { method: "POST", body: JSON.stringify({ order_id }) }),
+  createPayment: (order_id: number) => request("/payment/create", "POST", { order_id }),
 
   // Users
   getUsers: () => request("/users"),
-  updateUserRole: (id: number, role: string) => request(`/users/${id}/role`, { method: "PATCH", body: JSON.stringify({ role }) }),
-  updateUser: (id: number, data: any) => request(`/users/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  deleteUser: (id: number) => request(`/users/${id}`, { method: "DELETE" }),
-  createUser: (data: any) => request("/users", { method: "POST", body: JSON.stringify(data) }),
+  updateUser: (id: number, data: any) => request(`/users/${id}`, "PUT", data),
+  deleteUser: (id: number) => request(`/users/${id}`, "DELETE"),
+  createUser: (data: any) => request("/users", "POST", data),
   getStats: () => request("/users/stats"),
 
   // Helpers

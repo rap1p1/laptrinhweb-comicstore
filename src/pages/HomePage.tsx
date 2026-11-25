@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../App";
@@ -68,46 +68,40 @@ export default function HomePage() {
   const [addingToCart, setAddingToCart] = useState<number | null>(null);
   const [toast, setToast] = useState("");
 
-  const tags = useMemo(() => {
-    const allChars = comics.flatMap((c) => c.characters);
-    return ["Tất cả", ...Array.from(new Set(allChars)).sort()];
-  }, [comics]);
-
   useEffect(() => {
+    async function loadComics() {
+      try {
+        const data = await api.getComics();
+        const comics: Comic[] = data.comics || [];
+        setComics(comics);
+        if (Array.isArray(data.years)) {
+          setYears(data.years);
+        } else {
+          const years = comics.map((comic) => comic.publish_year || 0).filter(Boolean);
+          setYears([...new Set(years)].sort((a, b) => b - a));
+        }
+      } catch (err) {
+        console.error("Failed to load comics:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
     loadComics();
   }, []);
 
-  const loadComics = async () => {
-    try {
-      setLoading(true);
-      const data = await api.getComics();
-      setComics(data.comics || []);
-      if (data.years && Array.isArray(data.years)) {
-        setYears(data.years);
-      } else {
-        const uniqueYears = Array.from(new Set(data.comics.map((c: any) => c.publish_year).filter(Boolean))) as number[];
-        setYears(uniqueYears.sort((a, b) => b - a));
-      }
-    } catch (err) {
-      console.error("Failed to load comics:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const characters = comics.flatMap((comic) => comic.characters);
+  const uniqueCharacters = [...new Set(characters)].sort();
+  const tags = ["Tất cả", ...uniqueCharacters];
+  const term = query.trim().toLowerCase();
+  const filtered = comics.filter((comic) => {
+    if (selectedTag !== "Tất cả" && !comic.characters.includes(selectedTag)) return false;
+    if (selectedYear !== "Tất cả" && String(comic.publish_year) !== selectedYear) return false;
+    if (!term) return true;
 
-  const filtered = useMemo(() => {
-    return comics.filter((comic) => {
-      const matchesTag = selectedTag === "Tất cả" || comic.characters.includes(selectedTag);
-      const matchesYear = selectedYear === "Tất cả" || String(comic.publish_year) === selectedYear;
-      const term = query.trim().toLowerCase();
-      const matchesQuery =
-        !term ||
-        `${comic.title} ${comic.characters.join(" ")} ${comic.description} ${comic.publish_year || ""}`
-          .toLowerCase()
-          .includes(term);
-      return matchesTag && matchesYear && matchesQuery;
-    });
-  }, [comics, selectedTag, selectedYear, query]);
+    const searchableText = `${comic.title} ${comic.characters.join(" ")} ${comic.description} ${comic.publish_year || ""}`;
+    return searchableText.toLowerCase().includes(term);
+  });
 
   const addToCart = async (comicId: number) => {
     if (!user) {
